@@ -1,4 +1,4 @@
-# Dune Docker Lab
+# Dune Awakening Self-Host Docker
 
 Experimental Docker-native launcher for Dune: Awakening self-host server components.
 
@@ -53,8 +53,8 @@ Localhost-only ports:
 Clone the repo:
 
 ```bash
-git clone <[your-repo-url](https://github.com/Red-Blink/dune-awakening-selfhost-docker)> dune-docker-lab
-cd dune-docker-lab
+git clone https://github.com/Red-Blink/dune-awakening-selfhost-docker.git
+cd dune-awakening-selfhost-docker
 ```
 
 Create `.env` from the example:
