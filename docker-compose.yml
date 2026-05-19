@@ -10,7 +10,7 @@ services:
       SERVER_IP: "${SERVER_IP}"
       SERVER_TITLE: "${SERVER_TITLE}"
       SERVER_REGION: "${SERVER_REGION}"
-      STEAM_APP_ID: "${STEAM_APP_ID:-3104830}"
+      STEAM_APP_ID: "${STEAM_APP_ID:-4754530}"
       DUNE_ROOT: "/srv/dune"
       DUNE_SERVER_DIR: "/srv/dune/server"
       DUNE_STEAM_DIR: "/srv/dune/steam"

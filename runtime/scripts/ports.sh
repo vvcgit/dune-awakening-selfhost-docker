@@ -5,7 +5,7 @@ echo "=== Public / required ports ==="
 
 echo
 echo "TCP:"
-ss -lntp | grep -E ':(15432|31982|32573|5059|11717)' || true
+ss -lntp | grep -E ':(15432|31982|31983|32573|5059|11717)' || true
 
 echo
 echo "UDP:"
@@ -16,6 +16,7 @@ cat <<'EOF'
 Expected:
   Public TCP:
     31982  RabbitMQ game TLS
+    31983  RabbitMQ game HTTP
 
   Public UDP:
     7777   Overmap clients

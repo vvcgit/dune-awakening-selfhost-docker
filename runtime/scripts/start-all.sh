@@ -64,7 +64,7 @@ docker ps --filter "name=dune-" --format "table {{.Names}}\t{{.Status}}\t{{.Port
 
 echo
 echo "=== Required TCP listeners ==="
-ss -lntp | grep -E ':(15432|31982|32573|5059|11717)' || true
+ss -lntp | grep -E ':(15432|31982|31983|32573|5059|11717)' || true
 
 echo
 echo "=== Required UDP listeners ==="

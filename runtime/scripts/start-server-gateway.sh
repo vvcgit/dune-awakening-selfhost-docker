@@ -34,7 +34,7 @@ RMQ_HTTP_TOKEN_AUTH_SECRET="$(tr -d '\r\n' < "$RMQ_SECRET_FILE")"
 FLS_APIKEY="$(tr -d '\r\n' < "$FLS_APIKEY_FILE")"
 
 SERVER_TITLE="${SERVER_TITLE:-My Dune Server}"
-SERVER_REGION="${SERVER_REGION:-Europe Test}"
+SERVER_REGION="${SERVER_REGION:-Europe}"
 SERVER_IP="${SERVER_IP:-auto}"
 BATTLEGROUP_ID="${BATTLEGROUP_ID:-dune-docker}"
 
@@ -75,7 +75,8 @@ docker run -d \
   -m service \
   -c ./service/configs/service.conf \
   --RMQGameHostname="$SERVER_IP" \
-  --RMQGamePort=31982
+  --RMQGamePort=31982 \
+  --RMQGameHttpPort=31983
 
 sleep 12
 

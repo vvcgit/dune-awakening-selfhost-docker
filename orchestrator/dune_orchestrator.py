@@ -10,9 +10,9 @@ DUNE_ROOT = pathlib.Path(os.environ.get("DUNE_ROOT", "/srv/dune"))
 SERVER_DIR = pathlib.Path(os.environ.get("DUNE_SERVER_DIR", "/srv/dune/server"))
 STEAM_DIR = pathlib.Path(os.environ.get("DUNE_STEAM_DIR", "/srv/dune/steam"))
 GENERATED_DIR = pathlib.Path(os.environ.get("DUNE_GENERATED_DIR", "/srv/dune/generated"))
-STEAM_APP_ID = os.environ.get("STEAM_APP_ID", "3104830")
+STEAM_APP_ID = os.environ.get("STEAM_APP_ID", "4754530")
 SERVER_TITLE = os.environ.get("SERVER_TITLE", "My Dune Server")
-SERVER_REGION = os.environ.get("SERVER_REGION", "Europe Test")
+SERVER_REGION = os.environ.get("SERVER_REGION", "Europe")
 
 def run(cmd, check=True, user=None):
     printable = " ".join(str(x) for x in cmd)

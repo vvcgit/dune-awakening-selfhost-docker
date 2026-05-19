@@ -88,8 +88,32 @@ If map containers fail immediately with `Illegal instruction (core dumped)`, the
 
 | Mode | Who can connect? | Notes |
 |---|---|---|
-| Public / Internet | Players over the internet | Open or forward TCP `31982` and UDP `7777-7810` |
-| Local / LAN | Players on the same network | No internet port forwarding expected |
+| Public / Internet | Players over the internet | Requires public-facing network access. See the Ports section below. |
+| Local / LAN | Players on the same network | No internet port forwarding expected. |
+
+## Ports
+
+Open or forward these ports when hosting a public / internet server:
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| `31982` | TCP | RabbitMQ game TLS |
+| `31983` | TCP | RabbitMQ game HTTP |
+| `7777` | UDP | Overmap client traffic |
+| `7778` | UDP | Survival_1 client traffic |
+| `7779-7810` | UDP | Dynamic map client traffic |
+| `7888` | UDP | Survival_1 server-to-server traffic |
+| `7889` | UDP | Overmap server-to-server traffic |
+| `7890-7921` | UDP | Dynamic map server-to-server traffic |
+
+These ports are not meant to be opened publicly:
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| `15432` | TCP | Postgres localhost |
+| `32573` | TCP | RabbitMQ admin localhost |
+| `5059` | TCP | TextRouter localhost |
+| `11717` | TCP | Director localhost |
 
 ## Common Commands
 
@@ -161,7 +185,7 @@ dune servers
 
 The autoscaler starts with `dune start` so maps can be deployed automatically when players travel to dynamic regions.
 
-Dynamic maps use UDP `7779-7810` for game traffic and `7890-7921` for server-to-server traffic.
+Dynamic maps use the port ranges listed in the Ports section.
 
 `Survival_1` and `Overmap` are always-on protected maps. The manager will not stop them from the dynamic maps menu.
 

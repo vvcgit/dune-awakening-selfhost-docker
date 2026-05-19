@@ -132,6 +132,7 @@ echo "=== Ports ==="
 check_tcp 15432 "Postgres"
 check_tcp 32573 "RabbitMQ admin"
 check_tcp 31982 "RabbitMQ game"
+check_tcp 31983 "RabbitMQ game HTTP"
 check_tcp 5059 "TextRouter"
 check_tcp 11717 "Director"
 check_udp 7777 "Overmap clients"
@@ -141,7 +142,7 @@ check_udp 7889 "Overmap server-to-server"
 
 echo
 echo "=== Steam server files ==="
-app_id="$(config_value .env STEAM_APP_ID || echo "${STEAM_APP_ID:-3104830}")"
+app_id="$(config_value .env STEAM_APP_ID || echo "${STEAM_APP_ID:-4754530}")"
 if is_running dune-orchestrator; then
   if docker compose exec -T orchestrator test -f "/srv/dune/server/steamapps/appmanifest_${app_id}.acf" 2>/dev/null; then
     ok "Steam appmanifest found for app $app_id"
@@ -211,7 +212,7 @@ fi
 case "$mode" in
   public)
     ok "Hosting mode: public"
-    echo "     Make sure your firewall/router allows TCP 31982 and UDP 7777-7810."
+    echo "     Make sure your firewall/router allows TCP 31982, TCP 31983, and UDP 7777-7810."
     ;;
   local)
     ok "Hosting mode: local/LAN"

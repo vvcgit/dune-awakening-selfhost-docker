@@ -242,16 +242,22 @@ SERVER_TITLE="$(prompt_default "Server title" "My Dune Server")"
 
 echo
 echo "Select server region:"
-echo "  1) Europe Test"
-echo "  2) North America Test"
+echo "  1) Asia"
+echo "  2) Europe"
+echo "  3) North America"
+echo "  4) Oceania"
+echo "  5) South America"
 
 SERVER_REGION=""
 while [ -z "$SERVER_REGION" ]; do
-  read -r -p "Choice [1/2]: " region_choice
+  read -r -p "Choice [1-5]: " region_choice
   case "$region_choice" in
-    1) SERVER_REGION="Europe Test" ;;
-    2) SERVER_REGION="North America Test" ;;
-    *) echo "Invalid choice. Pick 1 or 2." ;;
+    1) SERVER_REGION="Asia" ;;
+    2) SERVER_REGION="Europe" ;;
+    3) SERVER_REGION="North America" ;;
+    4) SERVER_REGION="Oceania" ;;
+    5) SERVER_REGION="South America" ;;
+    *) echo "Invalid choice. Pick 1, 2, 3, 4, or 5." ;;
   esac
 done
 
@@ -301,7 +307,7 @@ done
 echo "Selected player-facing IP: $SERVER_IP ($SERVER_IP_MODE)"
 
 # Funcom self-host server Steam app id. This is selected automatically, not prompted.
-STEAM_APP_ID="${STEAM_APP_ID:-3104830}"
+STEAM_APP_ID="${STEAM_APP_ID:-4754530}"
 echo "Steam app id: $STEAM_APP_ID"
 
 echo
@@ -332,6 +338,7 @@ if [ "$SERVER_IP_MODE" = "public" ]; then
 
 Public hosting reminder:
   Open or forward TCP 31982.
+  Open or forward TCP 31983.
   Open or forward UDP 7777-7810.
 EOF
 fi

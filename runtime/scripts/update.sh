@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
 
-APP_ID="${STEAM_APP_ID:-3104830}"
+APP_ID="${STEAM_APP_ID:-4754530}"
 
 echo "=== Dune update scaffold ==="
 echo "Steam app id: $APP_ID"
@@ -135,7 +135,7 @@ set -euo pipefail
 STEAMCMD_SH=/srv/dune/steam/steamcmd.sh
 STEAMCMD_BIN=/srv/dune/steam/linux32/steamcmd
 INSTALL_DIR=/srv/dune/server
-APP_ID="${APP_ID:-3104830}"
+APP_ID="${APP_ID:-4754530}"
 APPINFO="/tmp/dune-appinfo-${APP_ID}.txt"
 MANIFEST="${INSTALL_DIR}/steamapps/appmanifest_${APP_ID}.acf"
 

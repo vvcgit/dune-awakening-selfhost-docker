@@ -174,6 +174,7 @@ done
 postgres_tcp="$(check_tcp 15432)"
 rmq_admin_tcp="$(check_tcp 32573)"
 rmq_game_tcp="$(check_tcp 31982)"
+rmq_game_http_tcp="$(check_tcp 31983)"
 text_router_tcp="$(check_tcp 5059)"
 director_tcp="$(check_tcp 11717)"
 overmap_udp="$(check_udp 7777)"
@@ -217,6 +218,7 @@ for listener_state in \
   "$postgres_tcp" \
   "$rmq_admin_tcp" \
   "$rmq_game_tcp" \
+  "$rmq_game_http_tcp" \
   "$text_router_tcp" \
   "$director_tcp" \
   "$overmap_udp" \
@@ -264,6 +266,7 @@ printf "%-24s %-8s %s\n" "CHECK" "PORT" "STATUS"
 printf "%-24s %-8s %s\n" "Postgres localhost" "15432/tcp" "$postgres_tcp"
 printf "%-24s %-8s %s\n" "RabbitMQ admin" "32573/tcp" "$rmq_admin_tcp"
 printf "%-24s %-8s %s\n" "RabbitMQ game" "31982/tcp" "$rmq_game_tcp"
+printf "%-24s %-8s %s\n" "RabbitMQ game HTTP" "31983/tcp" "$rmq_game_http_tcp"
 printf "%-24s %-8s %s\n" "TextRouter" "5059/tcp" "$text_router_tcp"
 printf "%-24s %-8s %s\n" "Director" "11717/tcp" "$director_tcp"
 printf "%-24s %-8s %s\n" "Overmap clients" "7777/udp" "$overmap_udp"

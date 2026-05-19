@@ -96,6 +96,7 @@ docker run -d \
   --network dune-net \
   --restart unless-stopped \
   -p 31982:5672/tcp \
+  -p 31983:15672/tcp \
   -v "$PWD/runtime/rabbitmq-game/config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$PWD/runtime/rabbitmq-game/config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro" \
   -v "$PWD/runtime/rabbitmq-game/certs/cacert.pem:/etc/rabbitmq/cacert.pem:ro" \

@@ -55,7 +55,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
   fi
 fi
 
-STEAM_APP_ID_VALUE="$(config_value .env STEAM_APP_ID || echo "${STEAM_APP_ID:-3104830}")"
+STEAM_APP_ID_VALUE="$(config_value .env STEAM_APP_ID || echo "${STEAM_APP_ID:-4754530}")"
 SERVER_IP_VALUE="$(config_value .env SERVER_IP || echo unknown)"
 SERVER_MODE_VALUE="$(config_value .env SERVER_IP_MODE || true)"
 

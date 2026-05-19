@@ -5,14 +5,16 @@ cd "$(dirname "$0")/../.."
 
 mkdir -p runtime/generated
 
-get_first_tag() {
+get_latest_tag() {
   local repo="$1"
   docker images --format '{{.Repository}} {{.Tag}}' \
-    | awk -v repo="$repo" '$1 == repo && $2 != "<none>" { print $2; exit }'
+    | awk -v repo="$repo" '$1 == repo && $2 != "<none>" { print $2 }' \
+    | sort -rV \
+    | head -n1
 }
 
-WORLD_TAG="$(get_first_tag registry.funcom.com/funcom/self-hosting/seabass-server)"
-POSTGRES_TAG="$(get_first_tag registry.funcom.com/funcom/self-hosting/igw-postgres)"
+WORLD_TAG="$(get_latest_tag registry.funcom.com/funcom/self-hosting/seabass-server)"
+POSTGRES_TAG="$(get_latest_tag registry.funcom.com/funcom/self-hosting/igw-postgres)"
 
 if [ -z "$WORLD_TAG" ]; then
   echo "Could not detect seabass-server image tag"
