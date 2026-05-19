@@ -17,20 +17,20 @@ This is an unofficial community project. It is not affiliated with, endorsed by,
 
 | Requirement | Notes |
 |---|---|
-| Linux server or Linux PC | VPS, dedicated server, or local Linux machine |
+| Linux Server | Ubuntu 24.04.4 LTS |
 | Docker Engine | Required |
 | Docker Compose | Required |
-| Funcom self-host token | Required |
-| Disk space | 100 GB+ recommended |
-| RAM | See sizing guide below |
+| Funcom Self-host token | Required |
+| Disk space | 100 GB+ |
+| RAM | See Guide Below |
 
-### RAM sizing guide
+### RAM Sizing Guide
 
-| Server layout | Recommended RAM |
+| Server Layout | Recommended RAM |
 |---|---:|
-| Basic Hagga Basin / Sietch layout | At least 20 GB |
-| Hagga Basin plus Story/Social maps | 30 GB |
-| Hagga Basin plus Story/Social maps plus Deep Desert | 40 GB |
+| Basic Hagga Basin / Sietch Layout | 20 GB |
+| Hagga Basin plus Story/Social Maps | 30 GB |
+| Hagga Basin plus Story/Social Maps + Deep Desert | 40 GB |
 
 ## Install
 
@@ -252,7 +252,7 @@ If a token is exposed, rotate it from your Funcom self-host account page.
 
 This repository does not include Funcom game files, Docker image tarballs, tokens, secrets, or proprietary assets. Server files and images are downloaded or loaded at runtime by the user's own environment.
 
-## Project identity
+## Project Identity
 
 This project is created and maintained as a RedBlink community project.
 
