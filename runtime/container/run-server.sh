@@ -167,6 +167,12 @@ amend_kubernetes_metadata() {
 fetch_external_node_address() {
     local -n address=$1
 
+    if [ -n "${EXTERNAL_ADDRESS_OVERRIDE:-}" ]; then
+        address="${EXTERNAL_ADDRESS_OVERRIDE}"
+        echo "Using configured external address override: $address"
+        return 0
+    fi
+
     if [ -n "${NODE_NAME:-}" ] && [ -n "${KUBERNETES_SERVICE_HOST:-}" ] && [ -n "${KUBERNETES_SERVICE_PORT_HTTPS:-}" ]; then
         service_account=/var/run/secrets/kubernetes.io/serviceaccount
         if [ -d "${service_account}" ]; then

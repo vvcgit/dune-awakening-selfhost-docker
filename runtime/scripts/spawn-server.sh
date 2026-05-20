@@ -241,6 +241,7 @@ docker run -d \
   -e "POD_UID=docker-$safe_name" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-${safe_name}-pod-${PARTITION_ID}" \
   -e "POD_IP=$MULTIHOME_IP" \
+  -e "EXTERNAL_ADDRESS_OVERRIDE=$SERVER_IP" \
   -e "NODE_NAME=$(hostname)" \
   -e "SERVER_INDEX=$SERVER_INDEX" \
   -e "FARM_NAME=$BATTLEGROUP_ID" \

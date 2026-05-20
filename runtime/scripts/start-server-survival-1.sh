@@ -70,6 +70,7 @@ docker run -d \
   -e "POD_UID=docker-survival-1" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-survival-1-pod-1" \
   -e "POD_IP=$MULTIHOME_IP" \
+  -e "EXTERNAL_ADDRESS_OVERRIDE=$SERVER_IP" \
   -e "NODE_NAME=$(hostname)" \
   -e "SERVER_INDEX=1" \
   -e "FARM_NAME=$BATTLEGROUP_ID" \

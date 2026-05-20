@@ -69,6 +69,7 @@ docker run -d \
   -e "POD_UID=docker-overmap" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-overmap-pod-2" \
   -e "POD_IP=$MULTIHOME_IP" \
+  -e "EXTERNAL_ADDRESS_OVERRIDE=$SERVER_IP" \
   -e "NODE_NAME=$(hostname)" \
   -e "SERVER_INDEX=2" \
   -e "FARM_NAME=$BATTLEGROUP_ID" \
