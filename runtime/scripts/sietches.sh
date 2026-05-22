@@ -632,7 +632,7 @@ reconcile_map_dimensions() {
     return 1
   }
 
-  safe_map="${map//'/'\'}"
+  safe_map="${map//'/'''}"
   target="$(python3 - "$map" <<'PY'
 import json
 import sys
@@ -784,6 +784,7 @@ runtime_args() {
   ensure_config
 python_common "$map" "$partition_id" <<'PY'
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -792,15 +793,21 @@ partition_id = str(sys.argv[5])
 partition_path = Path(sys.argv[1])
 config = json.loads(config_path.read_text()) if config_path.exists() else {"maps": {}, "partitions": {}}
 entry = config.get("partitions", {}).get(partition_id, {})
-partitions = json.loads(partition_path.read_text()) if partition_path.exists() else []
+db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
+partitions = json.loads(db_partitions) if db_partitions else (json.loads(partition_path.read_text()) if partition_path.exists() else [])
 row = next((item for item in partitions if str(item.get("id")) == partition_id), {})
 
 def ini_quote(value):
     return str(value)
 
+def default_display_name(partition_row):
+    label = str(partition_row.get("label") or "").strip()
+    return f"Sietch {label}" if label else ""
+
 args = []
-if entry.get("display_name"):
-    args.append(f"-ServerDisplayName={ini_quote(entry['display_name'])}")
+display_name = entry.get("display_name") or default_display_name(row)
+if display_name:
+    args.append(f"-ServerDisplayName={ini_quote(display_name)}")
 if entry.get("password"):
     args.append(f"-ServerLoginPassword={ini_quote(entry['password'])}")
 

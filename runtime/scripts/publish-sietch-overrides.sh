@@ -101,6 +101,11 @@ restore_route() {
     destination_type=queue \
     destination="$SINK_QUEUE" \
     properties_key="$SOURCE_ROUTING_KEY" >/dev/null 2>&1 || true
+  rmq_admin delete binding \
+    source="$SOURCE_EXCHANGE" \
+    destination_type=queue \
+    destination="$SOURCE_FILTER_QUEUE" \
+    properties_key="$SOURCE_ROUTING_KEY" >/dev/null 2>&1 || true
 }
 
 publish_payload() {

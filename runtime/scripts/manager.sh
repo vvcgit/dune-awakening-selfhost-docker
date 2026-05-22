@@ -1445,7 +1445,6 @@ apply_survival_browser_change() {
   run_cmd "$DUNE" restart survival
   run_cmd "$DUNE" restart director
   run_cmd "$DUNE" restart gateway
-  run_cmd runtime/scripts/publish-sietch-overrides.sh restart
 }
 
 apply_survival_partition_change() {
@@ -1461,7 +1460,6 @@ apply_survival_partition_change() {
   echo "This respawns the selected Survival_1 dimension and republishes the sietch overrides."
   run_cmd "$DUNE" despawn "$partition_id"
   run_cmd "$DUNE" spawn "$partition_id"
-  run_cmd runtime/scripts/publish-sietch-overrides.sh restart
 }
 
 set_display_name_for_map() {

@@ -122,4 +122,3 @@ echo
 echo "=== survival logs ==="
 docker logs --tail 180 dune-server-survival-1
 
-runtime/scripts/publish-sietch-overrides.sh restart >/dev/null 2>&1 || true
