@@ -6,6 +6,8 @@ cd "$(dirname "$0")/../.."
 [ -f .env ] && . ./.env
 [ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
+source runtime/scripts/runtime-env.sh
+
 set -a
 if [ -f .env ]; then
   . ./.env

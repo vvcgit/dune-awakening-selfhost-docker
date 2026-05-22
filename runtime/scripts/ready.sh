@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+source runtime/scripts/runtime-env.sh
+
 fail=0
 wait=0
 
