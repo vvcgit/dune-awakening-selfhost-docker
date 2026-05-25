@@ -83,6 +83,7 @@ case "$cmd" in
       gateway|sgw)
         set -a; [ -f .env ] && . ./.env; set +a
         runtime/scripts/start-server-gateway.sh
+        runtime/scripts/publish-sietch-overrides.sh once || true
         ;;
       director|bgd)
         set -a; [ -f .env ] && . ./.env; set +a

@@ -335,6 +335,11 @@ select_menu() {
     local choice
     echo "${C_BOLD}${C_CYAN}$title${C_RESET}" >&2
     printf '%*s\n' "${#title}" '' | tr ' ' '=' >&2
+    if [ -n "${MENU_CONTEXT_TEXT:-}" ]; then
+      echo >&2
+      printf '%s\n' "$MENU_CONTEXT_TEXT" >&2
+    fi
+    echo >&2
     for i in "${!options[@]}"; do
       printf " %2d) %s\n" "$((i + 1))" "${options[$i]}" >&2
     done
@@ -367,6 +372,10 @@ select_menu() {
     echo "${C_BOLD}${C_CYAN}$title${C_RESET}" >&2
     printf '%*s\n' "${#title}" '' | tr ' ' '=' >&2
     echo >&2
+    if [ -n "${MENU_CONTEXT_TEXT:-}" ]; then
+      printf '%s\n' "$MENU_CONTEXT_TEXT" >&2
+      echo >&2
+    fi
     for i in "${!options[@]}"; do
       if [ "$i" -eq "$selected" ]; then
         printf '  %s[X]%s %s%s%s\n' "$C_GREEN" "$C_RESET" "$C_BOLD" "${options[$i]}" "$C_RESET" >&2
@@ -1156,24 +1165,14 @@ usersettings_value() {
 
 userengine_about_text() {
   cat <<'EOF'
-Global UserEngine settings apply to every map and server in the battlegroup.
-These values are the battlegroup-wide baseline.
-Map-specific UserGame settings can customize gameplay for a single map,
-but this menu controls the global defaults used everywhere.
-Display name and password are managed through the dedicated Sietch flows.
+; Settings in these config files will be applied to every server in the battlegroup
+; If you need to override different settings for different servers, use the partition editor instead
 EOF
 }
 
 usergame_about_text() {
-  local map="$1"
-  local partition_id="${2:-}"
-  local target="$map map defaults"
-  [ -n "$partition_id" ] && target="$map partition $partition_id"
-  cat <<EOF
-Global UserEngine settings apply to every map and server in the battlegroup.
-These values are the battlegroup-wide baseline.
-UserGame settings can customize gameplay per map, with partition values
-overriding map defaults. This menu controls $target.
+  cat <<'EOF'
+; Settings in these config files will be applied only to this partition, and they will override the UserEngine settings.
 EOF
 }
 
@@ -1583,27 +1582,6 @@ edit_usergame_menu() {
           "patrol_ship_despawn_time|Patrol Ship Despawn Time|float"
         ;;
       8) return ;;
-    esac
-  done
-}
-
-edit_partition_pvp_only_menu() {
-  local map="$1"
-  local partition_id="$2"
-  local choice
-
-  while true; do
-    load_usersettings_values partition "$map" "$partition_id"
-    MENU_CONTEXT_TEXT="Only the selected partition's UserGame PvP list entry is editable here."
-    menu_or_back "Edit PvP: $map (Partition $partition_id)" \
-      "Partition PvP Enabled  Current: $(usersettings_value partition_pvp_enabled)" \
-      "Back" || return
-    MENU_CONTEXT_TEXT=""
-    choice="$MENU_CHOICE"
-
-    case "$choice" in
-      1) edit_usergame_boolean_field "$map" partition_pvp_enabled "Set Partition PvP" "Enabled" "Disabled" "True" "False" "$partition_id"; pause ;;
-      2) return ;;
     esac
   done
 }
@@ -2133,7 +2111,9 @@ restore_backup_flow() {
   local backup
 
   CHOSEN_BACKUP=""
-  choose_backup "Restore A Database Backup" || return
+  if ! choose_backup "Restore A Database Backup"; then
+    return 0
+  fi
   backup="$CHOSEN_BACKUP"
 
   restore_specific_backup_path "runtime/backups/db/$backup" "$backup"
@@ -2143,7 +2123,9 @@ delete_backup_flow() {
   local backup
 
   CHOSEN_BACKUP=""
-  choose_backup "Delete A Backup" || return
+  if ! choose_backup "Delete A Backup"; then
+    return 0
+  fi
   backup="$CHOSEN_BACKUP"
 
   echo
@@ -2633,10 +2615,7 @@ edit_dedicated_scaling_menu() {
         3)
           CHOSEN_PARTITION_ID=""
           choose_dimension_for_map "$map" "Pick Partition To Edit On $map" || { pause; continue; }
-          case "$map" in
-            DeepDesert|DeepDesert_1) edit_partition_pvp_only_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-            *) edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-          esac
+          edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID"
           ;;
         4) show_map_dimension_details "$map"; pause ;;
         5) return ;;
@@ -2670,10 +2649,7 @@ edit_dedicated_scaling_menu() {
         5)
           CHOSEN_PARTITION_ID=""
           choose_dimension_for_map "$map" "Pick Partition To Edit On $map" || { pause; continue; }
-          case "$map" in
-            DeepDesert|DeepDesert_1) edit_partition_pvp_only_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-            *) edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-          esac
+          edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID"
           ;;
         6) show_map_dimension_details "$map"; pause ;;
         7) return ;;
@@ -2704,10 +2680,7 @@ edit_dedicated_scaling_menu() {
       4)
         CHOSEN_PARTITION_ID=""
         choose_dimension_for_map "$map" "Pick Partition To Edit On $map" || { pause; continue; }
-        case "$map" in
-          DeepDesert|DeepDesert_1) edit_partition_pvp_only_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-          *) edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID" ;;
-        esac
+        edit_usergame_menu "$map" "$CHOSEN_PARTITION_ID"
         ;;
       5) show_map_dimension_details "$map"; pause ;;
       6) return ;;

@@ -30,10 +30,6 @@ echo "=== Starting Director ==="
 runtime/scripts/start-director.sh
 
 echo
-echo "=== Starting ServerGateway ==="
-runtime/scripts/start-server-gateway.sh
-
-echo
 echo "=== Starting Survival_1 ==="
 runtime/scripts/start-server-survival-1.sh
 
@@ -48,16 +44,26 @@ runtime/scripts/publish-sietch-overrides.sh restart || {
 }
 
 echo
+echo "=== Reconciling Active Sietch Dimensions ==="
+runtime/scripts/sietches.sh reconcile Survival_1 || {
+  echo "Could not reconcile Survival_1 active dimensions."
+}
+
+echo
+echo "=== Starting ServerGateway ==="
+runtime/scripts/start-server-gateway.sh
+
+echo
+echo "=== Publishing Survival Sietch State ==="
+runtime/scripts/publish-sietch-overrides.sh once || {
+  echo "Could not publish the latest Survival_1 browser state snapshot."
+}
+
+echo
 echo "=== Starting Autoscaler ==="
 runtime/scripts/start-autoscaler.sh || {
   echo "Autoscaler did not start. Dynamic maps will not spawn automatically."
   echo "Check with: dune autoscaler status"
-}
-
-echo
-echo "=== Reconciling Active Sietch Dimensions ==="
-runtime/scripts/sietches.sh reconcile Survival_1 || {
-  echo "Could not reconcile Survival_1 active dimensions."
 }
 
 

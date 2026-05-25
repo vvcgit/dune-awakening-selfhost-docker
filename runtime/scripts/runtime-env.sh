@@ -260,11 +260,21 @@ resolve_server_ip() {
 }
 
 resolve_bind_ip() {
-  local requested detected
+  local requested existing detected
 
   requested="$(first_known_value "${SERVER_BIND_IP:-}" "$(config_value .env SERVER_BIND_IP 2>/dev/null || true)" || true)"
   if bind_ip_is_assigned "$requested"; then
     printf '%s' "$requested"
+    return 0
+  fi
+
+  existing="$(first_known_value \
+    "$(container_env_value_any_state dune-server-survival-1 POD_IP 2>/dev/null || true)" \
+    "$(container_env_value_any_state dune-server-overmap POD_IP 2>/dev/null || true)" \
+    "$(any_container_env_value_matching '^dune-server-' POD_IP 2>/dev/null || true)" \
+    || true)"
+  if is_ipv4 "$existing"; then
+    printf '%s' "$existing"
     return 0
   fi
 

@@ -7,9 +7,11 @@ INTERVAL="${DUNE_AUTOSCALER_INTERVAL:-5}"
 SINCE="${DUNE_AUTOSCALER_LOG_SINCE:-30s}"
 IDLE_SECONDS="${DUNE_AUTOSCALER_IDLE_SECONDS:-300}"
 STATE_FILE="${DUNE_AUTOSCALER_STATE_FILE:-runtime/generated/autoscaler-idle.tsv}"
+SERVER_ID_MAP_FILE="${DUNE_AUTOSCALER_SERVER_ID_MAP_FILE:-runtime/generated/autoscaler-server-ids.tsv}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
+touch "$SERVER_ID_MAP_FILE"
 
 echo "=== Dune Docker autoscaler ==="
 echo "Watching Director travel queues and idle dynamic servers."
@@ -156,6 +158,40 @@ clear_idle_since() {
   mv "$tmp" "$STATE_FILE"
 }
 
+remember_server_id_map() {
+  local map="$1"
+  local server_id="$2"
+  local tmp
+
+  [ -n "$map" ] || return 0
+  [ -n "$server_id" ] || return 0
+
+  tmp="$(mktemp)"
+  awk -F '\t' -v sid="$server_id" '$1 != sid { print }' "$SERVER_ID_MAP_FILE" > "$tmp"
+  printf '%s\t%s\n' "$server_id" "$map" >> "$tmp"
+  mv "$tmp" "$SERVER_ID_MAP_FILE"
+}
+
+map_for_server_id() {
+  local server_id="$1"
+  awk -F '\t' -v sid="$server_id" '$1 == sid { print $2; found=1; exit } END { if (!found) exit 1 }' "$SERVER_ID_MAP_FILE"
+}
+
+assigned_server_for_map() {
+  local map="$1"
+  local safe
+  safe="$(printf '%s' "$map" | tr -cd 'A-Za-z0-9_')"
+
+  psql_value "
+    select coalesce(server_id, '')
+    from dune.world_partition
+    where lower(map) = lower('$safe')
+      and coalesce(server_id, '') <> ''
+    order by partition_id
+    limit 1;
+  "
+}
+
 handle_demand() {
   local map="$1"
   local num="$2"
@@ -218,8 +254,9 @@ handle_idle_row() {
   local map="$1"
   local server_id="$2"
   local connected_players="$3"
-  local ready="$4"
-  local alive="$5"
+  local effective_players="$4"
+  local ready="$5"
+  local alive="$6"
 
   case "$map" in
     Survival_1|Overmap)
@@ -230,7 +267,7 @@ handle_idle_row() {
   local key
   key="$(state_key "$map" "$server_id")"
 
-  if [ "$connected_players" != "0" ] || [ "$ready" != "t" ] || [ "$alive" != "t" ]; then
+  if [ "$connected_players" != "0" ] || [ "$effective_players" != "0" ] || [ "$ready" != "t" ] || [ "$alive" != "t" ]; then
     clear_idle_since "$key"
     return 0
   fi
@@ -244,7 +281,7 @@ handle_idle_row() {
     since="$now"
     age=0
     set_idle_since "$key" "$since"
-    echo "IDLE map=$map server=$server_id players=0 grace=${IDLE_SECONDS}s"
+    echo "IDLE map=$map server=$server_id players=0 effective=0 grace=${IDLE_SECONDS}s"
   fi
 
   if [ "$age" -ge "$IDLE_SECONDS" ]; then
@@ -257,18 +294,87 @@ handle_idle_row() {
 scan_idle_servers() {
   docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
     select
-      map,
-      server_id,
-      connected_players,
-      ready,
-      alive
-    from dune.farm_state
+      fs.map,
+      fs.server_id,
+      fs.connected_players,
+      coalesce(effective_players, 0) as effective_players,
+      fs.ready,
+      fs.alive
+    from dune.farm_state fs
+    left join (
+      select
+        server_id,
+        count(*) filter (
+          where online_status <> 'Offline'
+             or (
+               reconnect_grace_period_end is not null
+               and reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
+             )
+             or (
+               last_avatar_activity is not null
+               and last_avatar_activity > (current_timestamp - make_interval(secs => ${IDLE_SECONDS}))
+             )
+        ) as effective_players
+      from dune.player_state
+      where coalesce(server_id, '') <> ''
+      group by server_id
+    ) ps on ps.server_id = fs.server_id
     where map not in ('Survival_1', 'Overmap')
-      and coalesce(server_id, '') <> ''
+      and coalesce(fs.server_id, '') <> ''
     order by map;
-  " | while IFS='|' read -r map server_id connected_players ready alive; do
+  " | while IFS='|' read -r map server_id connected_players effective_players ready alive; do
     [ -z "${map:-}" ] && continue
-    handle_idle_row "$map" "$server_id" "$connected_players" "$ready" "$alive"
+    remember_server_id_map "$map" "$server_id"
+    handle_idle_row "$map" "$server_id" "$connected_players" "$effective_players" "$ready" "$alive"
+  done
+}
+
+scan_reconnect_demand() {
+  docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
+    select distinct ps.server_id
+    from dune.player_state ps
+    left join dune.farm_state fs on fs.server_id = ps.server_id
+    where coalesce(ps.server_id, '') <> ''
+      and fs.server_id is null
+      and (
+        ps.online_status <> 'Offline'
+        or (
+          ps.reconnect_grace_period_end is not null
+          and ps.reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
+        )
+        or (
+          ps.last_avatar_activity is not null
+          and ps.last_avatar_activity > (current_timestamp - make_interval(secs => ${IDLE_SECONDS}))
+        )
+      );
+  " | while IFS= read -r stale_server_id; do
+    local map assigned_server running
+
+    [ -n "${stale_server_id:-}" ] || continue
+    map="$(map_for_server_id "$stale_server_id" 2>/dev/null || true)"
+    [ -n "$map" ] || continue
+
+    assigned_server="$(assigned_server_for_map "$map")"
+    running="$(container_count_for_map "$map")"
+
+    if [ -z "$assigned_server" ] && [ "$running" = "0" ]; then
+      echo "SPAWN reconnect map=$map stale_server=$stale_server_id"
+      runtime/scripts/spawn-server.sh "$map" || {
+        echo "ERROR failed to spawn reconnect map=$map"
+        continue
+      }
+      assigned_server="$(assigned_server_for_map "$map")"
+    fi
+
+    if [ -n "$assigned_server" ] && [ "$assigned_server" != "$stale_server_id" ]; then
+      psql_value "
+        update dune.encrypted_player_state
+        set server_id = '$assigned_server'
+        where server_id = '$stale_server_id';
+      " >/dev/null
+      echo "REMAP reconnect map=$map from=$stale_server_id to=$assigned_server"
+      remember_server_id_map "$map" "$assigned_server"
+    fi
   done
 }
 
@@ -311,5 +417,6 @@ for line in sys.stdin:
 while true; do
   scan_travel_demand
   scan_idle_servers
+  scan_reconnect_demand
   sleep "$INTERVAL"
 done

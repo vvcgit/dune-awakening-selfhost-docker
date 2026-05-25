@@ -197,6 +197,28 @@ pick_port() {
   return 1
 }
 
+survival_reserved_dimensions() {
+  python3 <<'PY'
+import json
+from pathlib import Path
+
+config_path = Path("runtime/generated/sietch-config.json")
+count = 1
+
+if config_path.exists():
+    try:
+        config = json.loads(config_path.read_text())
+        count = int(config.get("maps", {}).get("Survival_1", {}).get("max_dimensions") or 1)
+    except Exception:
+        count = 1
+
+if count < 1:
+    count = 1
+
+print(count)
+PY
+}
+
 if [ "$MAP_NAME" = "Survival_1" ]; then
   GAME_PORT="$((CLIENT_PORT_BASE + 1 + DIMENSION_INDEX))"
   if [ "$DIMENSION_INDEX" -eq 0 ]; then
@@ -212,9 +234,10 @@ if [ "$MAP_NAME" = "Survival_1" ]; then
     exit 1
   fi
 else
-  game_start="$((CLIENT_PORT_BASE + 2))"
+  RESERVED_SURVIVAL_DIMS="$(survival_reserved_dimensions)"
+  game_start="$((CLIENT_PORT_BASE + 1 + RESERVED_SURVIVAL_DIMS))"
   game_end="$((CLIENT_PORT_BASE + 33))"
-  igw_start="$((IGW_PORT_BASE + 2))"
+  igw_start="$((IGW_PORT_BASE + 1 + RESERVED_SURVIVAL_DIMS))"
   igw_end="$((IGW_PORT_BASE + 33))"
   GAME_PORT="$(pick_port "$game_start" "$game_end" || true)"
   IGW_PORT="$(pick_port "$igw_start" "$igw_end" || true)"

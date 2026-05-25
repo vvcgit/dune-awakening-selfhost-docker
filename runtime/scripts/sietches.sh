@@ -42,6 +42,77 @@ if changed:
 PY
 }
 
+prune_orphan_partition_config() {
+  local db_rows=""
+  local db_json=""
+
+  if docker_postgres_running; then
+    db_rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "
+      select partition_id, map, dimension_index, coalesce(label, ''), blocked
+      from dune.world_partition
+      order by partition_id;
+    " 2>/dev/null || true)"
+    if [ -n "$db_rows" ]; then
+      db_json="$(SIETCH_DB_ROWS="$db_rows" python3 -c '
+import json
+import os
+rows = []
+for line in os.environ.get("SIETCH_DB_ROWS", "").splitlines():
+    parts = line.split("\t")
+    if len(parts) < 5:
+        continue
+    partition_id, map_name, dimension, label, blocked = parts[:5]
+    try:
+        rows.append({
+            "id": int(partition_id),
+            "map": map_name,
+            "dimension": int(dimension or 0),
+            "label": label,
+            "disable": blocked.lower() in ("t", "true", "1", "yes"),
+        })
+    except ValueError:
+        continue
+print(json.dumps(rows))
+' 2>/dev/null || true)"
+    fi
+  fi
+
+  SIETCH_DB_PARTITIONS_JSON="$db_json" python3 - "$PARTITION_CATALOG" "$CONFIG_FILE" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+partition_path = Path(sys.argv[1])
+config_path = Path(sys.argv[2])
+
+if not config_path.exists():
+    raise SystemExit
+
+config = json.loads(config_path.read_text())
+partitions_cfg = config.get("partitions")
+if not isinstance(partitions_cfg, dict) or not partitions_cfg:
+    raise SystemExit
+
+db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
+if db_partitions:
+    partitions = json.loads(db_partitions)
+elif partition_path.exists():
+    partitions = json.loads(partition_path.read_text())
+else:
+    partitions = []
+
+valid_ids = {str(row.get("id")) for row in partitions if row.get("id") is not None}
+filtered = {key: value for key, value in partitions_cfg.items() if key in valid_ids}
+
+if filtered == partitions_cfg:
+    raise SystemExit
+
+config["partitions"] = filtered
+config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+PY
+}
+
 generate_partition_catalog_from_server_catalog() {
   [ -s "$SERVER_CATALOG" ] || return 1
 
@@ -137,6 +208,7 @@ ensure_config() {
   fi
 
   normalize_config_defaults
+  prune_orphan_partition_config
   set_config_permissions
 }
 
@@ -589,9 +661,23 @@ Path("runtime/generated/partition-catalog.json").write_text(
 PY
 }
 
+refresh_survival_browser_state() {
+  if [ -x runtime/scripts/publish-sietch-overrides.sh ]; then
+    runtime/scripts/publish-sietch-overrides.sh restart >/dev/null 2>&1 || true
+    runtime/scripts/publish-sietch-overrides.sh once >/dev/null 2>&1 || true
+  fi
+}
+
+refresh_survival_gateway_state() {
+  if docker ps --format '{{.Names}}' | grep -qx dune-server-gateway; then
+    runtime/scripts/start-server-gateway.sh >/dev/null 2>&1 || true
+  fi
+}
+
 ensure_map_partitions() {
   local map="$1"
   local wanted="$2"
+  ENSURE_MAP_PARTITIONS_CHANGED=0
 
   docker_postgres_running || {
     echo "dune-postgres must be running to add dimensions." >&2
@@ -645,14 +731,19 @@ select dune.update_partition_labels(true);
 " >/dev/null
     current=$((current + 1))
     next_dim=$((next_dim + 1))
+    ENSURE_MAP_PARTITIONS_CHANGED=1
   done
 
   sync_partition_catalog_from_db
+  if [ "$map" = "Survival_1" ]; then
+    refresh_survival_browser_state
+  fi
 }
 
 reconcile_map_dimensions() {
   local map="$1"
   local safe_map target available base_partition assigned_count
+  local topology_changed=0
 
   ensure_config
 
@@ -689,6 +780,9 @@ PY
 
   if [ "$map" = "Survival_1" ]; then
     ensure_map_partitions "$map" "$target"
+    if [ "${ENSURE_MAP_PARTITIONS_CHANGED:-0}" -eq 1 ]; then
+      topology_changed=1
+    fi
   fi
 
   available="$(psql_value "select count(*) from dune.world_partition where lower(map) = lower('$safe_map');" | tr -d '[:space:]')"
@@ -724,6 +818,7 @@ PY
       fi
       runtime/scripts/spawn-server.sh "$next_partition"
       assigned_count=$((assigned_count + 1))
+      topology_changed=1
     done
 
     while [ "$assigned_count" -gt "$target" ]; do
@@ -739,7 +834,25 @@ PY
       [ -n "$remove_partition" ] || break
       runtime/scripts/despawn-server.sh "$remove_partition"
       assigned_count=$((assigned_count - 1))
+      topology_changed=1
     done
+
+    if docker exec dune-postgres psql -U postgres -d dune -Atc "
+with ranked as (
+  select
+    partition_id,
+    row_number() over (order by dimension_index, partition_id) as ord,
+    coalesce(server_id, '') as server_id
+  from dune.world_partition
+  where lower(map) = lower('$safe_map')
+)
+select count(*)
+from ranked
+where ord > $target
+  and server_id = '';
+" | grep -qv '^0$'; then
+      topology_changed=1
+    fi
 
     docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
 set search_path = dune, public;
@@ -777,6 +890,10 @@ where wp.partition_id = ranked.partition_id;
   fi
 
   sync_partition_catalog_from_db
+  if [ "$map" = "Survival_1" ] && [ "$topology_changed" -eq 1 ]; then
+    refresh_survival_browser_state
+    refresh_survival_gateway_state
+  fi
 }
 
 set_partition_value() {
