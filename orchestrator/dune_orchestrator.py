@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import time
@@ -10,9 +11,15 @@ DUNE_ROOT = pathlib.Path(os.environ.get("DUNE_ROOT", "/srv/dune"))
 SERVER_DIR = pathlib.Path(os.environ.get("DUNE_SERVER_DIR", "/srv/dune/server"))
 STEAM_DIR = pathlib.Path(os.environ.get("DUNE_STEAM_DIR", "/srv/dune/steam"))
 GENERATED_DIR = pathlib.Path(os.environ.get("DUNE_GENERATED_DIR", "/srv/dune/generated"))
+DUNE_HOME = pathlib.Path(os.environ.get("DUNE_HOME", "/home/dune"))
 STEAM_APP_ID = os.environ.get("STEAM_APP_ID", "4754530")
 SERVER_TITLE = os.environ.get("SERVER_TITLE", "My Dune Server")
 SERVER_REGION = os.environ.get("SERVER_REGION", "Europe")
+
+try:
+    MIN_FREE_GB = int(os.environ.get("DUNE_MIN_FREE_GB", "25"))
+except ValueError:
+    MIN_FREE_GB = 25
 
 def run(cmd, check=True, user=None):
     printable = " ".join(str(x) for x in cmd)
@@ -51,10 +58,55 @@ def ensure_dirs():
     for p in [DUNE_ROOT, SERVER_DIR, STEAM_DIR, GENERATED_DIR, DUNE_ROOT / "cache"]:
         p.mkdir(parents=True, exist_ok=True)
 
-    pathlib.Path("/home/dune/.steam").mkdir(parents=True, exist_ok=True)
+    (DUNE_HOME / ".steam").mkdir(parents=True, exist_ok=True)
 
     run(["chown", "-R", "dune:dune", str(DUNE_ROOT)], check=False)
-    run(["chown", "-R", "dune:dune", "/home/dune"], check=False)
+    run(["chown", "-R", "dune:dune", str(DUNE_HOME)], check=False)
+
+def check_free_space():
+    if os.environ.get("DUNE_SKIP_DISK_CHECK", "").strip() == "1":
+        print("[dune] Disk free-space check skipped by DUNE_SKIP_DISK_CHECK=1.", flush=True)
+        return
+
+    ensure_dirs()
+
+    required_bytes = MIN_FREE_GB * 1024 * 1024 * 1024
+    paths = [DUNE_ROOT, SERVER_DIR, STEAM_DIR, GENERATED_DIR, DUNE_ROOT / "cache"]
+    checked = {}
+    too_low = []
+
+    print(f"[dune] Checking free disk space, required minimum: {MIN_FREE_GB} GiB", flush=True)
+
+    for path in paths:
+        existing = path if path.exists() else path.parent
+        usage = shutil.disk_usage(existing)
+        mount_key = (usage.total, usage.used, usage.free)
+        if mount_key in checked:
+            continue
+        checked[mount_key] = True
+
+        free_gb = usage.free / 1024 / 1024 / 1024
+        total_gb = usage.total / 1024 / 1024 / 1024
+        print(f"[dune] Disk space at {existing}: {free_gb:.1f} GiB free / {total_gb:.1f} GiB total", flush=True)
+
+        if usage.free < required_bytes:
+            too_low.append((str(existing), free_gb))
+
+    if too_low:
+        print("", flush=True)
+        print("[dune] Not enough free disk space for a safe Dune server install/update.", flush=True)
+        print("[dune] SteamDB currently lists the self-hosted server package as about 4.94 GiB download and 5.79 GiB installed before Docker image loading.", flush=True)
+        print("[dune] This project also needs room for Docker images, volumes, database files, backups, and generated runtime data.", flush=True)
+        print("[dune] Free disk space is below the configured safety minimum:", flush=True)
+        for path, free_gb in too_low:
+            print(f"[dune]   {path}: {free_gb:.1f} GiB free, needs at least {MIN_FREE_GB} GiB", flush=True)
+        print("", flush=True)
+        print("[dune] Free disk space or move Docker's data-root to a larger disk, then retry:", flush=True)
+        print("[dune]   runtime/scripts/update.sh install", flush=True)
+        print("[dune] Advanced override if you know there is enough external Docker storage:", flush=True)
+        print("[dune]   DUNE_MIN_FREE_GB=10 runtime/scripts/update.sh install", flush=True)
+        print("[dune]   DUNE_SKIP_DISK_CHECK=1 runtime/scripts/update.sh install", flush=True)
+        sys.exit(3)
 
 def ensure_steamcmd():
     ensure_dirs()
@@ -80,28 +132,47 @@ def ensure_steamcmd():
     run(["tar", "-xzf", str(tmp), "-C", str(STEAM_DIR)])
     tmp.unlink(missing_ok=True)
 
-    run(["chown", "-R", "dune:dune", str(STEAM_DIR), "/home/dune/.steam"])
-    run(["ln", "-sfn", str(STEAM_DIR), "/home/dune/.steam/root"], user="dune")
-    run(["ln", "-sfn", str(STEAM_DIR), "/home/dune/.steam/steam"], user="dune")
+    run(["chown", "-R", "dune:dune", str(STEAM_DIR), str(DUNE_HOME / ".steam")])
+    run(["ln", "-sfn", str(STEAM_DIR), str(DUNE_HOME / ".steam" / "root")], user="dune")
+    run(["ln", "-sfn", str(STEAM_DIR), str(DUNE_HOME / ".steam" / "steam")], user="dune")
 
 def download():
     ensure_steamcmd()
+    check_free_space()
 
     print(f"[dune] Downloading/updating Steam app {STEAM_APP_ID}", flush=True)
     print(f"[dune] Target directory: {SERVER_DIR}", flush=True)
 
-    run([
-        "env",
-        "HOME=/home/dune",
-        str(STEAM_DIR / "steamcmd.sh"),
-        "+@ShutdownOnFailedCommand", "1",
-        "+@NoPromptForPassword", "1",
-        "+force_install_dir", str(SERVER_DIR),
-        "+login", "anonymous",
-        "+app_update", STEAM_APP_ID, "validate",
-        "+logoff",
-        "+quit",
-    ], user="dune")
+    try:
+        run([
+            "env",
+            f"HOME={DUNE_HOME}",
+            str(STEAM_DIR / "steamcmd.sh"),
+            "+@ShutdownOnFailedCommand", "1",
+            "+@NoPromptForPassword", "1",
+            "+@sSteamCmdForcePlatformType", "linux",
+            "+force_install_dir", str(SERVER_DIR),
+            "+login", "anonymous",
+            "+app_update", STEAM_APP_ID, "validate",
+            "+logoff",
+            "+quit",
+        ], user="dune")
+    except subprocess.CalledProcessError as exc:
+        print("", flush=True)
+        print(f"[dune] SteamCMD app install failed with exit code {exc.returncode}.", flush=True)
+        print("[dune] If SteamCMD printed \"state is 0x6\", common causes are:", flush=True)
+        print("[dune]   - not enough free disk space in Docker's volume storage", flush=True)
+        print("[dune]   - Steam temporarily refusing or failing the anonymous depot request", flush=True)
+        print("[dune]   - Steam package/depot metadata changed and the local SteamCMD cache is stale", flush=True)
+        print("[dune]   - network/CDN failure while contacting Steam", flush=True)
+        print("", flush=True)
+        print("[dune] Useful checks:", flush=True)
+        print("[dune]   docker exec dune-orchestrator df -h /srv/dune/server /srv/dune/steam /srv/dune/cache", flush=True)
+        print(f"[dune]   docker exec dune-orchestrator tail -n 80 {DUNE_HOME}/Steam/logs/stderr.txt", flush=True)
+        print("", flush=True)
+        print("[dune] Retry safely after fixing the cause:", flush=True)
+        print("[dune]   runtime/scripts/update.sh install", flush=True)
+        sys.exit(exc.returncode)
 
     print("[dune] Download finished.", flush=True)
 
@@ -131,6 +202,7 @@ def help_text():
 Usage:
   dune help       Show this help
   dune daemon     Keep the orchestrator container running
+  dune preflight  Check disk space before downloading server files
   dune status     Verify Docker access and runtime config
   dune download   Download/update Dune server files with SteamCMD
 """.strip())
@@ -142,10 +214,15 @@ def main():
         status()
     elif cmd == "daemon":
         daemon()
+    elif cmd == "preflight":
+        check_free_space()
     elif cmd == "download":
         download()
+    elif cmd in {"help", "--help", "-h"}:
+        help_text()
     else:
         help_text()
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()

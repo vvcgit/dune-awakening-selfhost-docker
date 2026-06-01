@@ -666,6 +666,7 @@ Common problems:
 | `docker: command not found` | Install Docker Engine and Docker Compose. |
 | Docker daemon not reachable | Run `sudo systemctl enable --now docker`, add your user to the docker group, then re-login or run `newgrp docker`. |
 | Missing Funcom token | Run `dune init` or place it in `runtime/secrets/funcom-token.txt`. |
+| SteamCMD `state is 0x6` during init | Usually disk space, Steam anonymous depot availability, stale SteamCMD metadata, or Steam CDN/network failure. Check `docker exec dune-orchestrator df -h /srv/dune/server /srv/dune/steam /srv/dune/cache`, free space, then retry `runtime/scripts/update.sh install`. |
 | Server not showing publicly | Check `SERVER_IP`, router/firewall forwarding, and `dune ports`. |
 | Server only needed for LAN | Use a local/private server IP during init. |
 | Port conflict | Run `dune ports` and check other services using the same ports. |

@@ -303,6 +303,13 @@ if [ "$assume_yes" != "1" ]; then
 fi
 
 echo
+echo "=== Check Docker volume free space ==="
+docker compose exec -T \
+  -e DUNE_MIN_FREE_GB="${DUNE_MIN_FREE_GB:-25}" \
+  -e DUNE_SKIP_DISK_CHECK="${DUNE_SKIP_DISK_CHECK:-}" \
+  orchestrator dune preflight
+
+echo
 echo "=== Stop game servers before update ==="
 runtime/scripts/recycle-world-game-servers.sh stop-all
 
@@ -351,6 +358,16 @@ done
 if [ "$steam_ok" != "1" ]; then
   echo
   echo "SteamCMD failed after $steam_max_attempts attempts."
+  echo
+  echo "Most common fresh-install causes:"
+  echo "  - Docker volume storage has too little free disk space."
+  echo "  - Steam temporarily rejected the anonymous depot request."
+  echo "  - SteamCMD cache/metadata is stale after a Steam-side app change."
+  echo
+  echo "Useful checks:"
+  echo "  docker exec dune-orchestrator df -h /srv/dune/server /srv/dune/steam /srv/dune/cache"
+  echo "  docker exec dune-orchestrator tail -n 80 /home/dune/Steam/logs/stderr.txt"
+  echo
   echo "You can retry safely with:"
   echo "  runtime/scripts/update.sh install"
   exit 1
