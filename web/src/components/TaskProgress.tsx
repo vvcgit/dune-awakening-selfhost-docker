@@ -38,7 +38,10 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
       </div>
       <p>{liveTask.progressMessage || liveTask.currentStep}</p>
       {liveTask.errorMessage && <p className="error">{liveTask.errorMessage}</p>}
-      <pre className="log-box">{liveTask.logLines.slice(-120).map((line) => line.line).join("\n")}</pre>
+      <details className="technical-details">
+        <summary>Technical details</summary>
+        <pre className="log-box">{liveTask.logLines.slice(-120).map((line) => line.line).join("\n")}</pre>
+      </details>
     </section>
   );
 }

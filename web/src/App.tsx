@@ -21,7 +21,6 @@ import { LogViewer } from "./components/LogViewer";
 import { BackupRestorePanel } from "./components/BackupRestorePanel";
 import { PortChecklist } from "./components/PortChecklist";
 import { ReadinessTimeline } from "./components/ReadinessTimeline";
-import { ServiceHealthCard } from "./components/ServiceHealthCard";
 
 type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Market" | "Starter Kit" | "Database" | "Storage" | "Bases" | "Blueprints" | "Backups" | "Logs" | "Updates" | "Settings";
 type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string };
@@ -223,15 +222,16 @@ function HomePanel({ status, readiness, setTask, onLoad }: { status: string; rea
         </div>
         {localError && <p className="error">{localError}</p>}
       </article>
-      <ServiceHealthCard name="Runtime" status={status ? "checked" : "unknown"} />
-      <ServiceHealthCard name="Readiness" status={readiness ? "checked" : readinessWarning ? "not ready / check failed" : loading ? "checking" : "unknown"} />
+      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} />
       {readinessWarning && <article className="panel wide warning-panel">
         <h3>Readiness check warning</h3>
         <p>Dune readiness can fail while the stack is still starting or partially unavailable. Server status loaded, so the web admin is still connected.</p>
-        <pre className="mini-output">{readinessWarning}</pre>
+        <TechnicalDetails text={readinessWarning} />
       </article>}
-      <pre className="mini-output wide">{status || "Status has not been loaded."}</pre>
-      {readiness && <pre className="mini-output wide">{readiness}</pre>}
+      <TechnicalDetails className="wide" title="Technical details" text={formatTechnicalText([
+        ["dune status", status || "Status has not been loaded."],
+        ["dune ready", readiness || readinessWarning || "Readiness has not been loaded."]
+      ])} />
     </section>
   );
 }
@@ -268,7 +268,7 @@ function ServerPanel(props: { setTask: (task: Task) => void; setStatus: (text: s
       </div>
       <ReadinessTimeline text={props.readiness} />
       <PortChecklist text={props.ports} />
-      <pre className="mini-output">{props.doctor || "Run Doctor to show diagnostics."}</pre>
+      <DoctorSummary text={props.doctor} />
     </section>
   );
 }
@@ -312,7 +312,8 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
   const [itemId, setItemId] = useState("");
   const [search, setSearch] = useState("");
   const [catalog, setCatalog] = useState("");
-  const [liveToolResult, setLiveToolResult] = useState("");
+  const [liveToolSummary, setLiveToolSummary] = useState("");
+  const [liveToolDetails, setLiveToolDetails] = useState("");
   const [xp, setXp] = useState("1000");
   const [message, setMessage] = useState("");
   const [broadcastDuration, setBroadcastDuration] = useState("30");
@@ -320,6 +321,10 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
   async function run(action: () => Promise<unknown>) {
     onError("");
     try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+  }
+  function showLiveToolResult(result: unknown) {
+    setLiveToolSummary(formatLiveToolResult(result));
+    setLiveToolDetails(JSON.stringify(result, null, 2));
   }
   return (
     <section className="panel">
@@ -344,7 +349,10 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
         <button onClick={() => run(async () => setCatalog((await adminApi.vehicles(search)).stdout))}>Vehicle List</button>
         <button onClick={() => run(async () => setCatalog((await adminApi.skillModules(search)).stdout))}>Skill Module List</button>
       </div>
-      <pre className="mini-output">{catalog || "Use the catalog tools to find item names, raw item IDs, vehicles, and skill modules."}</pre>
+      <div className="result-panel">
+        <strong>Catalog Results</strong>
+        <pre className="mini-output">{catalog || "Use the catalog tools to find item names, raw item IDs, vehicles, and skill modules."}</pre>
+      </div>
       <h3>Global Live Tools</h3>
       <p className="danger-note">Experimental: RabbitMQ publish works, but in-game display is not working/verified on the live server.</p>
       <div className="action-line">
@@ -353,13 +361,17 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
       <div className="action-line broadcast-line">
         <label className="broadcast-message">Broadcast Message<input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Broadcast or whisper message" /></label>
         <label className="inline-field">Duration seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
-        <button onClick={() => run(async () => setLiveToolResult(JSON.stringify(await adminApi.broadcast(message, Number(broadcastDuration || 30)), null, 2)))}>Broadcast Publish Test</button>
+        <button onClick={() => run(async () => showLiveToolResult(await adminApi.broadcast(message, Number(broadcastDuration || 30))))}>Broadcast Publish Test</button>
       </div>
       <div className="action-line">
-        <button className="danger" onClick={() => run(async () => window.confirm("Send shutdown broadcast publish test? In-game visibility is unverified.") && setLiveToolResult(JSON.stringify(await adminApi.shutdownBroadcast({ confirmation: "SHUTDOWN BROADCAST", delayMinutes: 15, shutdownType: "Restart" }), null, 2)))}>Shutdown Broadcast Publish Test</button>
-        <button onClick={() => run(async () => setLiveToolResult(JSON.stringify(await adminApi.whisper(playerId, message), null, 2)))}>Whisper</button>
+        <button className="danger" onClick={() => run(async () => { if (window.confirm("Send shutdown broadcast publish test? In-game visibility is unverified.")) showLiveToolResult(await adminApi.shutdownBroadcast({ confirmation: "SHUTDOWN BROADCAST", delayMinutes: 15, shutdownType: "Restart" })); })}>Shutdown Broadcast Publish Test</button>
+        <button onClick={() => run(async () => showLiveToolResult(await adminApi.whisper(playerId, message)))}>Whisper</button>
       </div>
-      <pre className="mini-output">{liveToolResult || "Broadcast, shutdown broadcast, and whisper results appear here. Broadcast publish success does not prove in-game display."}</pre>
+      <div className="result-panel">
+        <strong>Global Live Tool Result</strong>
+        <p>{liveToolSummary || "Broadcast, shutdown broadcast, and whisper results appear here. Broadcast publish success does not prove in-game display."}</p>
+        {liveToolDetails && <TechnicalDetails text={liveToolDetails} />}
+      </div>
       <h3>Command History</h3>
       <button onClick={() => run(async () => setHistory((await adminApi.history()).stdout))}>Refresh Command History</button>
       <pre className="mini-output">{history || "History comes from runtime/generated/admin-command-history.tsv."}</pre>
@@ -403,7 +415,9 @@ function PlayersPanel({ setTask, onError }: { setTask: (task: Task) => void; onE
           <p><strong>DB actor/player ID:</strong> {dbPlayerId || "missing"}</p>
           <p><strong>Admin action ID:</strong> {actionPlayerId || "missing"}</p>
         </div>
-        <pre className="mini-output">{JSON.stringify(detail, null, 2)}</pre>
+        <PlayerSummary detail={detail} fallback={selected} dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} />
+        <PlayerCapabilities capabilities={(detail?.capabilities as Record<string, unknown> | undefined) || {}} />
+        <TechnicalDetails title="Player profile technical details" text={JSON.stringify(detail, null, 2)} />
         <div className="action-row">{["inventory", "currency", "factions", "specs", "position", "progression", "events", "stats", "history"].map((name) => <button key={name} className={tab === name ? "active" : ""} onClick={() => setTab(name)}>{name}</button>)}</div>
         <PlayerDetailTab playerId={dbPlayerId} tab={tab} onError={onError} />
         <PlayerActions dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} setTask={setTask} onError={onError} onRefresh={() => open(selected)} />
@@ -429,9 +443,11 @@ function PlayerActions({ dbPlayerId, actionPlayerId, setTask, onError, onRefresh
   const [faction, setFaction] = useState({ factionId: "1", amount: "1" });
   const [refuelVehicleId, setRefuelVehicleId] = useState("");
   const [result, setResult] = useState("");
+  const [resultDetails, setResultDetails] = useState("");
   async function run(action: () => Promise<unknown>) {
     onError("");
     setResult("");
+    setResultDetails("");
     try { await action(); } catch (error) { const text = error instanceof Error ? error.message : String(error); setResult(text); onError(text); }
   }
   async function runTask(action: () => Promise<{ task: Task }>) {
@@ -442,7 +458,8 @@ function PlayerActions({ dbPlayerId, actionPlayerId, setTask, onError, onRefresh
   }
   async function runDirect(action: () => Promise<unknown>) {
     const response = await action();
-    setResult(JSON.stringify(response, null, 2));
+    setResult(formatMutationResult(response));
+    setResultDetails(JSON.stringify(response, null, 2));
     onRefresh();
   }
   function parsedMultiItems() {
@@ -486,7 +503,7 @@ function PlayerActions({ dbPlayerId, actionPlayerId, setTask, onError, onRefresh
   return <section className="action-panel">
     <h3>Player Actions</h3>
     {!canRunCliAction && <p className="danger-note">{cliDisabledReason}</p>}
-    {result && <p className="danger-note">{result}</p>}
+    {result && <div className="result-panel"><strong>Action Result</strong><p>{result}</p>{resultDetails && <TechnicalDetails text={resultDetails} />}</div>}
     <div className="action-sections">
       <section className="action-section">
         <h4>Give Items</h4>
@@ -616,6 +633,7 @@ async function waitForTask(task: Task, setTask: (task: Task) => void) {
 function PlayerDetailTab({ playerId, tab, onError }: { playerId: string; tab: string; onError: (text: string) => void }) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = useState("");
+  const [messageDetails, setMessageDetails] = useState("");
   async function loadTab() {
     const loaders: Record<string, () => Promise<Record<string, unknown>>> = {
       inventory: () => playersApi.inventory(playerId),
@@ -640,16 +658,18 @@ function PlayerDetailTab({ playerId, tab, onError }: { playerId: string; tab: st
     if (!window.confirm(`Delete item ${itemId} (${String(row.template_id || "")}) from player ${playerId}? A database backup will be created first.`)) return;
     try {
       const response = await playersApi.deleteInventoryItem(playerId, itemId, "DELETE ITEM");
-      setMessage(JSON.stringify(response, null, 2));
+      setMessage(formatMutationResult(response));
+      setMessageDetails(JSON.stringify(response, null, 2));
       await loadTab();
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       setMessage(text);
+      setMessageDetails("");
       onError(text);
     }
   }
   const rows = Array.isArray(data?.rows) ? data.rows as Record<string, unknown>[] : data?.position ? [data.position as Record<string, unknown>] : [];
-  return <div>{data?.reason ? <p className="danger-note">{String(data.reason)}</p> : null}{message && <p className="danger-note">{message}</p>}<DataTable rows={rows} action={tab === "inventory" ? (row) => <button className="danger" onClick={(event) => { event.stopPropagation(); deleteItem(row); }}>Delete Item</button> : undefined} /></div>;
+  return <div>{data?.reason ? <p className="danger-note">{String(data.reason)}</p> : null}{message && <div className="result-panel"><strong>Mutation Result</strong><p>{message}</p>{messageDetails && <TechnicalDetails text={messageDetails} />}</div>}<DataTable rows={rows} action={tab === "inventory" ? (row) => <button className="danger" onClick={(event) => { event.stopPropagation(); deleteItem(row); }}>Delete Item</button> : undefined} /></div>;
 }
 
 function LogsPanel({ selectedService, setSelectedService, text, setText, onError }: { selectedService: string; setSelectedService: (service: string) => void; text: string; setText: Dispatch<SetStateAction<string>>; onError: (text: string) => void }) {
@@ -838,8 +858,8 @@ function MarketPanel({ onError }: { onError: (text: string) => void }) {
     {message && <p className="danger-note">{message}</p>}
 
     <h3>{title}</h3>
-    {info && <pre className="mini-output">{JSON.stringify(info, null, 2)}</pre>}
-    {stats && <pre className="mini-output">{JSON.stringify(stats, null, 2)}</pre>}
+    {info && <MarketCapabilitySummary info={info} />}
+    {stats && <MarketStats stats={stats} />}
     {!info && !stats && (rows.length ? <DataTable rows={rows} /> : <div className="empty">{marketEmptyText}</div>)}
   </section>;
 }
@@ -956,8 +976,8 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
         <DataTable rows={history} columns={["timestamp", "character_name", "action_player_id", "source", "version", "status", "summary"]} />
       </section>
     </div>
-    {output && <pre className="mini-output">{output}</pre>}
-    {technicalOutput && <details><summary>Technical details</summary><pre className="mini-output">{technicalOutput}</pre></details>}
+    {output && <div className="result-panel"><strong>Starter Kit Result</strong><pre className="mini-output concise-output">{output}</pre></div>}
+    {technicalOutput && <TechnicalDetails text={technicalOutput} />}
     <details>
       <summary>Raw Starter Kit JSON</summary>
       <pre className="mini-output">{JSON.stringify(config, null, 2)}</pre>
@@ -1126,7 +1146,15 @@ function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
       })}
     </div>
     <p className="danger-note">Coordinates use raw Dune world positions from actor transforms. Exact image/world calibration is not verified, so this plot is for relative position and inspection.</p>
-    {selected && <section className="drawer"><div className="panel-title"><h3>{String(selected.name || selected.id)}</h3><button onClick={() => setSelected(null)}>Close</button></div><pre className="mini-output">{JSON.stringify(selected, null, 2)}</pre></section>}
+    {selected && <section className="drawer"><div className="panel-title"><h3>{String(selected.name || selected.id)}</h3><button onClick={() => setSelected(null)}>Close</button></div><KeyValueGrid items={[
+      ["Type", selected.type],
+      ["Name", selected.name],
+      ["ID", selected.id],
+      ["Map", selected.map],
+      ["X", selected.x],
+      ["Y", selected.y],
+      ["Z", selected.z]
+    ]} /><TechnicalDetails title="Marker technical details" text={JSON.stringify(selected, null, 2)} /></section>}
     <DataTable rows={visible as Record<string, unknown>[]} />
   </section>;
 }
@@ -1194,7 +1222,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       <button onClick={() => run(async () => { if (window.confirm("Bootstrap Dual Deep Desert?")) await runTask(() => mapsApi.updateDeepdesert({ action: "bootstrap", confirmation: "UPDATE DEEP DESERT" })); })}>Bootstrap Deep Desert</button>
     </div>
     <p className="danger-note">Map mode, spawn/despawn, autoscaler, active Sietch dimensions, passwords, and Deep Desert changes can affect live services and require backend confirmation.</p>
-    <pre className="mini-output">{text || "Map, autoscaler, memory, Sietch, or Deep Desert state is loading or unavailable."}</pre>
+    <MapCommandSummary text={text} />
   </section>;
 }
 
@@ -1227,18 +1255,155 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
 }
 
 function SettingsPanel() {
-  const [text, setText] = useState("");
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   async function refresh() {
-    setText(JSON.stringify(await api("/api/settings"), null, 2));
+    setSettings(await api<Record<string, unknown>>("/api/settings"));
   }
   useEffect(() => {
     refresh().catch(() => undefined);
   }, []);
-  return <section className="panel"><h2>Settings</h2><button onClick={refresh}>Refresh Runtime Settings</button><pre className="mini-output">{text}</pre></section>;
+  return <section className="panel">
+    <div className="panel-title"><h2>Settings</h2><button onClick={refresh}>Refresh Runtime Settings</button></div>
+    <RuntimeSettingsSummary settings={settings} />
+    <TechnicalDetails text={settings ? JSON.stringify(settings, null, 2) : "Runtime settings have not loaded yet."} />
+  </section>;
+}
+
+function HomeHealthCards({ status, readiness, readinessWarning, loading }: { status: string; readiness: string; readinessWarning: string; loading: boolean }) {
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading);
+  return <div className="health-grid wide">
+    {summary.map((item) => <article className="status-card" key={item.label}>
+      <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
+      <strong>{item.value}</strong>
+    </article>)}
+  </div>;
+}
+
+function DoctorSummary({ text }: { text: string }) {
+  const status = inferStatus(text || "");
+  const issues = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /warn|fail|error|missing|not ready/i.test(line)).slice(0, 6);
+  return <section className="action-section">
+    <div className="panel-title"><h4>Doctor Diagnostics</h4><StatusPill value={text ? status : "Unknown"} /></div>
+    {text ? <p>{issues.length ? `${issues.length} warning or failure line${issues.length === 1 ? "" : "s"} detected.` : "No obvious warning lines detected in the latest doctor output."}</p> : <p>Run Doctor to show diagnostics.</p>}
+    {issues.length > 0 && <div className="check-grid">{issues.map((issue, index) => <article className="check-card" key={`${issue}-${index}`}><div><strong>Diagnostic warning</strong><p>{issue}</p></div><StatusPill value="Warning" /></article>)}</div>}
+    <TechnicalDetails title="Doctor technical details" text={text || "Run Doctor to show diagnostics."} />
+  </section>;
+}
+
+function PlayerSummary({ detail, fallback, dbPlayerId, actionPlayerId }: { detail: Record<string, unknown> | null; fallback: Record<string, unknown>; dbPlayerId: string; actionPlayerId: string }) {
+  const player = ((detail?.player as Record<string, unknown> | undefined) || fallback) as Record<string, unknown>;
+  return <section className="action-section">
+    <h4>Player Summary</h4>
+    <KeyValueGrid items={[
+      ["Character", firstDefined(player.character_name, player.name, fallback.character_name)],
+      ["Online status", firstDefined(player.online_status, fallback.online_status)],
+      ["Map", firstDefined(player.map, player.world, fallback.map)],
+      ["DB actor/player ID", dbPlayerId || "missing"],
+      ["Admin action ID", actionPlayerId || "missing"],
+      ["Account ID", firstDefined(player.account_id, fallback.account_id)],
+      ["Funcom/FLS ID", firstDefined(player.funcom_id, player.fls_id, fallback.funcom_id, fallback.fls_id)],
+      ["Controller ID", firstDefined(player.player_controller_id, fallback.player_controller_id)]
+    ]} />
+  </section>;
+}
+
+function PlayerCapabilities({ capabilities }: { capabilities: Record<string, unknown> }) {
+  const keys = ["inventory", "currency", "factions", "specs", "progression", "events", "stats", "history"];
+  return <section className="action-section">
+    <h4>Detected Capabilities</h4>
+    <div className="badge-row">
+      {keys.map((key) => {
+        const value = capabilities[key];
+        const label = value === true ? "Available" : value === false ? "Unavailable" : value === undefined ? "Unknown" : String(value);
+        return <span className={`badge ${value === true ? "badge-pass" : value === false ? "badge-fail" : "badge-info"}`} key={key}>{key}: {label}</span>;
+      })}
+    </div>
+  </section>;
+}
+
+function MarketCapabilitySummary({ info }: { info: Record<string, unknown> }) {
+  const supported = firstDefined(info.supported, info.ok, info.available);
+  const reason = firstDefined(info.reason, info.message, info.error, "Market automation remains blocked unless a compatible RedBlink market-bot runtime is added.");
+  return <section className="warning-panel action-section">
+    <div className="panel-title"><h4>Market Capability Status</h4><StatusPill value={supported === true ? "Ready" : "Blocked"} /></div>
+    <p>{String(reason)}</p>
+    <KeyValueGrid items={Object.entries(info).filter(([key]) => !["reason", "message", "error"].includes(key)).slice(0, 8)} />
+    <TechnicalDetails text={JSON.stringify(info, null, 2)} />
+  </section>;
+}
+
+function MarketStats({ stats }: { stats: Record<string, unknown> }) {
+  return <section className="action-section">
+    <h4>Market Stats</h4>
+    <KeyValueGrid items={Object.entries(stats)} />
+    <TechnicalDetails text={JSON.stringify(stats, null, 2)} />
+  </section>;
+}
+
+function RuntimeSettingsSummary({ settings }: { settings: Record<string, unknown> | null }) {
+  const config = (settings?.config as Record<string, unknown> | undefined) || {};
+  const files = (settings?.files as Record<string, unknown> | undefined) || {};
+  return <div className="action-sections">
+    <section className="action-section">
+      <h4>Runtime Configuration</h4>
+      <KeyValueGrid items={[
+        ["App name", firstDefined(config.appName, config.app_name, "Arrakis Server Console")],
+        ["Repo root", config.repoRoot],
+        ["Auth", config.authEnabled === false ? "Disabled" : "Enabled"],
+        ["Secure cookies", booleanLabel(config.secureCookies)],
+        ["Host bootstrap", booleanLabel(config.allowHostBootstrap)],
+        ["Mock mode", booleanLabel(config.mockMode)],
+        ["Runtime path", config.runtimePath],
+        ["Task retention", config.taskRetention]
+      ]} />
+    </section>
+    <section className="action-section">
+      <h4>Files Checklist</h4>
+      <div className="check-grid">{Object.entries(files).map(([key, value]) => <article className="check-card" key={key}><div><strong>{key}</strong><p>{value ? "Found" : "Missing"}</p></div><StatusPill value={value ? "Ready" : "Warning"} /></article>)}</div>
+      {!Object.keys(files).length && <p>Runtime file checks have not loaded yet.</p>}
+    </section>
+  </div>;
+}
+
+function MapCommandSummary({ text }: { text: string }) {
+  const parsed = parseJsonMaybe(text);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>;
+    return <section className="result-panel">
+      <strong>Map Status Summary</strong>
+      <KeyValueGrid items={Object.entries(record).map(([key, value]) => [key, summarizeValue(value)])} />
+      <TechnicalDetails text={text} />
+    </section>;
+  }
+  const status = text ? inferStatus(text) : "Unknown";
+  return <section className="result-panel">
+    <div className="panel-title"><strong>Map Command Result</strong><StatusPill value={status} /></div>
+    <p>{text ? summarizeCommandText(text) : "Map, autoscaler, memory, Sietch, or Deep Desert state is loading or unavailable."}</p>
+    <TechnicalDetails text={text || "No map command output loaded yet."} />
+  </section>;
+}
+
+function KeyValueGrid({ items }: { items: [string, unknown][] }) {
+  const visible = items.filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (!visible.length) return <div className="empty">No summary values available.</div>;
+  return <div className="key-value-grid">{visible.map(([key, value]) => <div className="key-value-item" key={key}>
+    <span>{key}</span>
+    <strong>{formatCell(value)}</strong>
+  </div>)}</div>;
+}
+
+function StatusPill({ value }: { value: unknown }) {
+  const text = String(value || "Unknown");
+  const normalized = normalizeStatus(text);
+  return <span className={`badge badge-${normalized}`}>{text}</span>;
+}
+
+function TechnicalDetails({ text, title = "Technical details", className = "" }: { text: string; title?: string; className?: string }) {
+  return <details className={`technical-details ${className}`.trim()}><summary>{title}</summary><pre className="mini-output">{text}</pre></details>;
 }
 
 function OutputPanel({ title, text, action, onAction }: { title: string; text: string; action: string; onAction: () => void }) {
-  return <section className="panel"><h2>{title}</h2><button onClick={onAction}>{action}</button><pre className="mini-output">{text}</pre></section>;
+  return <section className="panel"><h2>{title}</h2><button onClick={onAction}>{action}</button><TechnicalDetails text={text} /></section>;
 }
 
 function DataTable({ rows, columns, onRowClick, action }: { rows: Record<string, unknown>[]; columns?: string[]; onRowClick?: (row: Record<string, unknown>) => void; action?: (row: Record<string, unknown>) => React.ReactNode }) {
@@ -1251,6 +1416,114 @@ function formatCell(value: unknown) {
   if (value === null || value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function formatTechnicalText(sections: [string, string][]) {
+  return sections.map(([title, text]) => `# ${title}\n${text}`).join("\n\n");
+}
+
+function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean) {
+  const combined = `${status}\n${readiness}`;
+  return [
+    { label: "Overall status", value: readiness ? "Readiness checked" : readinessWarning ? "Status available, readiness warning" : status ? "Status loaded" : loading ? "Checking" : "Unknown", status: readiness ? inferStatus(readiness) : readinessWarning ? "Warning" : status ? inferStatus(status) : loading ? "Running" : "Unknown" },
+    { label: "Server title", value: findLineValue(status, ["server title", "title", "SERVER_TITLE"]) || "Unknown", status: "Info" },
+    { label: "Region", value: findLineValue(status, ["region", "SERVER_REGION"]) || "Unknown", status: "Info" },
+    { label: "Mode", value: findLineValue(status, ["mode", "server mode"]) || "Unknown", status: "Info" },
+    { label: "Server IP", value: findLineValue(status, ["server ip", "ip", "SERVER_IP"]) || "Unknown", status: "Info" },
+    { label: "Battlegroup", value: findLineValue(status, ["battlegroup", "battlegroup id"]) || "Unknown", status: "Info" },
+    { label: "Population", value: findLineValue(status, ["population", "players"]) || "Unknown", status: inferStatus(findLineValue(status, ["population", "players"]) || "") },
+    { label: "Container health", value: summarizeSubsystem(combined, ["container", "docker", "compose"]), status: summarizeSubsystem(combined, ["container", "docker", "compose"]) },
+    { label: "Listener health", value: summarizeSubsystem(combined, ["listener", "port", "listening"]), status: summarizeSubsystem(combined, ["listener", "port", "listening"]) },
+    { label: "Database/world partitions", value: summarizeSubsystem(combined, ["database", "postgres", "partition"]), status: summarizeSubsystem(combined, ["database", "postgres", "partition"]) },
+    { label: "Game server readiness", value: readiness ? summarizeSubsystem(readiness, ["ready", "game", "server"]) : readinessWarning ? "Check failed" : "Unknown", status: readiness ? inferStatus(readiness) : readinessWarning ? "Warning" : "Unknown" },
+    { label: "Automation status", value: summarizeSubsystem(combined, ["autoscaler", "automation"]), status: summarizeSubsystem(combined, ["autoscaler", "automation"]) },
+    { label: "RabbitMQ status", value: summarizeSubsystem(combined, ["rabbit", "rmq"]), status: summarizeSubsystem(combined, ["rabbit", "rmq"]) },
+    { label: "FLS/Funcom status", value: summarizeSubsystem(combined, ["fls", "funcom"]), status: summarizeSubsystem(combined, ["fls", "funcom"]) }
+  ];
+}
+
+function findLineValue(text: string, keys: string[]) {
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    for (const key of keys) {
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = line.match(new RegExp(`^\\s*${escaped}\\s*[:=]\\s*(.+)$`, "i"));
+      if (match) return match[1].trim();
+    }
+  }
+  return "";
+}
+
+function summarizeSubsystem(text: string, keywords: string[]) {
+  const lines = text.split(/\r?\n/).filter((line) => keywords.some((keyword) => line.toLowerCase().includes(keyword)));
+  if (!lines.length) return "Unknown";
+  return inferStatus(lines.join("\n"));
+}
+
+function inferStatus(text: string) {
+  if (!text) return "Unknown";
+  if (/failed|failure|error|fatal|unhealthy|down|missing|cannot|could not/i.test(text)) return "Failed";
+  if (/warning|warn|not ready|starting|waiting|partial|unavailable/i.test(text)) return "Warning";
+  if (/ready|ok|healthy|running|listening|up|succeeded|success|checked|found/i.test(text)) return "Ready";
+  return "Unknown";
+}
+
+function normalizeStatus(value: string) {
+  if (/ready|ok|healthy|running|up|succeeded|success|checked|found|available|enabled/i.test(value)) return "pass";
+  if (/failed|failure|error|fatal|unhealthy|down|missing|blocked|disabled/i.test(value)) return "fail";
+  if (/warning|warn|not ready|starting|waiting|partial|unverified|experimental|unavailable|checking/i.test(value)) return "warn";
+  return "info";
+}
+
+function formatLiveToolResult(result: unknown) {
+  const record = result && typeof result === "object" ? result as Record<string, unknown> : {};
+  if (record.supported === false) return `Unsupported: ${String(record.reason || record.error || "This live tool is not available.")}`;
+  if (record.ok === false) return `Failed: ${String(record.error || record.stderr || "The live tool did not complete.")}`;
+  const note = String(record.note || "");
+  if (/broadcast/i.test(note) || /publish=ok/i.test(String(record.stdout || ""))) {
+    return note || "RabbitMQ publish succeeded, but in-game display has not been verified.";
+  }
+  if (record.ok === true) return "Live tool request completed. Review technical details if troubleshooting is needed.";
+  return summarizeCommandText(JSON.stringify(record || result));
+}
+
+function formatMutationResult(result: unknown) {
+  const record = result && typeof result === "object" ? result as Record<string, unknown> : {};
+  if (record.supported === false) return `Unsupported: ${String(record.reason || record.error || "This action is not available.")}`;
+  if (record.ok === false) return `Failed: ${String(record.error || record.reason || "The action did not complete.")}`;
+  if (record.summary) return String(record.summary);
+  if (record.status) return `Action status: ${String(record.status)}`;
+  if (record.backup) return "Action completed after creating a database backup.";
+  if (record.ok === true) return "Action completed.";
+  return summarizeCommandText(JSON.stringify(record || result));
+}
+
+function summarizeCommandText(text: string) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return "No output.";
+  const important = lines.filter((line) => /ok|ready|warning|error|failed|success|blocked|unsupported|publish/i.test(line));
+  return (important[0] || lines[0]).slice(0, 240);
+}
+
+function parseJsonMaybe(text: string) {
+  if (!text.trim().startsWith("{") && !text.trim().startsWith("[")) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function summarizeValue(value: unknown) {
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if ("exitCode" in record) return `exit ${String(record.exitCode)}`;
+    if ("stdout" in record) return summarizeCommandText(String(record.stdout || record.stderr || ""));
+    return Array.isArray(value) ? `${value.length} rows` : `${Object.keys(record).length} fields`;
+  }
+  return value;
+}
+
+function booleanLabel(value: unknown) {
+  if (value === true) return "Enabled";
+  if (value === false) return "Disabled";
+  return value ?? "Unknown";
 }
 
 function firstDefined(...values: unknown[]) {

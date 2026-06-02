@@ -82,6 +82,22 @@ main { padding: 22px; min-width: 0; }
 .service-card, .check-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 14px; }
 .service-card div, .check-card div { display: grid; gap: 4px; }
 .service-card span, .check-card p { margin: 0; color: #ad9f89; }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.status-card, .result-panel, .key-value-item {
+  background: #171a1d;
+  border: 1px solid #302b25;
+  border-radius: 8px;
+  padding: 14px;
+}
+.status-card { display: grid; gap: 8px; min-height: 112px; }
+.status-card-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #ad9f89; }
+.status-card strong { color: #fff1d4; overflow-wrap: anywhere; }
+.status-card p, .result-panel p { margin: 0; color: #ad9f89; }
+.key-value-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.key-value-item { display: grid; gap: 5px; }
+.key-value-item span { color: #ad9f89; font-size: 13px; }
+.key-value-item strong { color: #fff1d4; overflow-wrap: anywhere; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .badge { border-radius: 999px; padding: 4px 9px; font-size: 12px; text-transform: uppercase; border: 1px solid #555; color: #ddd; }
 .badge-pass, .badge-succeeded { border-color: #3d8b62; color: #9be6bd; }
 .badge-warn, .badge-running { border-color: #a97932; color: #ffd08a; }
@@ -103,6 +119,14 @@ main { padding: 22px; min-width: 0; }
   color: #e9dcc8;
   max-height: 380px;
 }
+.concise-output { max-height: 180px; }
+.technical-details { margin-top: 12px; }
+.technical-details summary {
+  cursor: pointer;
+  color: #ffd08a;
+  width: max-content;
+}
+.technical-details[open] summary { margin-bottom: 8px; }
 .log-box.large { min-height: 480px; }
 .command-preview { color: #ffd08a; }
 .empty, .danger-note, .error, .error-banner { color: #ffc0c0; }
