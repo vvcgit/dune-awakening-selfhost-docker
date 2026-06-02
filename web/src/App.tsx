@@ -854,9 +854,11 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
   const [eligible, setEligible] = useState<Record<string, unknown>[]>([]);
   const [history, setHistory] = useState<Record<string, unknown>[]>([]);
   const [output, setOutput] = useState("");
+  const [technicalOutput, setTechnicalOutput] = useState("");
   async function run(action: () => Promise<void>) {
     onError("");
     setOutput("");
+    setTechnicalOutput("");
     try { await action(); } catch (error) { const text = error instanceof Error ? error.message : String(error); setOutput(text); onError(text); }
   }
   async function load() {
@@ -892,27 +894,23 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
         <p>{config.enabled ? "Starter Kit is enabled." : "Starter Kit is disabled."}</p>
         <p>{starterItemCount ? `${starterItemCount} starter item${starterItemCount === 1 ? "" : "s"} configured.` : "No starter items configured."}</p>
         <p>{config.autoGrantEnabled ? `Auto-grant scans every ${config.autoGrantIntervalSeconds} seconds when enabled.` : "Auto-grant is off by default."}</p>
-        <div className="action-line">
-          <button onClick={() => run(async () => { if (window.confirm("Enable Starter Kit config? Manual grants remain confirmation-gated.")) setConfig(await starterKitApi.enable("ENABLE STARTER KIT")); })}>Enable</button>
-          <button className="danger" onClick={() => run(async () => { if (window.confirm("Disable Starter Kit?")) setConfig(await starterKitApi.disable("DISABLE STARTER KIT")); })}>Disable</button>
-        </div>
       </section>
 
       <section className="action-section">
         <h4>Starter Kit Configuration</h4>
+        <p>Use exact item names from Admin Tools {"->"} Item Search. Example: Plant Fiber, not fiber.</p>
         <div className="action-line">
           <label>Version<input value={config.version} onChange={(event) => setConfig({ ...config, version: event.target.value })} /></label>
           <label>XP<input type="number" min="0" value={String(config.xp)} onChange={(event) => setConfig({ ...config, xp: Number(event.target.value) })} /></label>
           <label className="checkbox-line"><input type="checkbox" checked={config.allowRepeatGrants} onChange={(event) => setConfig({ ...config, allowRepeatGrants: event.target.checked })} /> <span>Allow repeat manual grants</span></label>
-          <button onClick={() => run(async () => { if (window.confirm("Save Starter Kit config?")) setConfig(await starterKitApi.saveConfig(nextConfig(), "SAVE STARTER KIT")); })}>Save Config</button>
         </div>
-      </section>
-
-      <section className="action-section">
-        <h4>Starter Items</h4>
         <p>One item per line: item name or raw item ID, quantity, durability.</p>
-        <pre className="command-preview">fiber,10,1{"\n"}cup of water,1,1</pre>
-        <label>Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="fiber,10,1&#10;cup of water,1,1" /></label>
+        <label>Starter Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,1&#10;cup of water,1,1" /></label>
+        <div className="action-line">
+          <button onClick={() => run(async () => { if (window.confirm("Save Starter Kit config?")) { const saved = await starterKitApi.saveConfig(nextConfig(), "SAVE STARTER KIT"); setConfig(saved); setItemsText(saved.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n")); setOutput("Starter Kit config saved."); } })}>Save Config</button>
+          <button onClick={() => run(async () => { if (window.confirm("Enable Starter Kit config? Manual grants remain confirmation-gated.")) setConfig(await starterKitApi.enable("ENABLE STARTER KIT")); })}>Enable</button>
+          <button className="danger" onClick={() => run(async () => { if (window.confirm("Disable Starter Kit?")) setConfig(await starterKitApi.disable("DISABLE STARTER KIT")); })}>Disable</button>
+        </div>
       </section>
 
       <section className="action-section">
@@ -925,7 +923,7 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
               {String(player.character_name || "Unknown")} - {String(player.online_status || "unknown")} - actor {String(player.actor_id || "-")} - admin {String(player.action_player_id || "missing")}
             </option>)}
           </select></label>
-          <button disabled={!grantPlayerId} onClick={() => run(async () => { if (window.confirm(`Grant Starter Kit to ${selectedLabel || grantPlayerId}?`)) setOutput(JSON.stringify(await starterKitApi.grant(grantPlayerId, "GRANT STARTER KIT"), null, 2)); })}>Grant Starter Kit</button>
+          <button disabled={!grantPlayerId} onClick={() => run(async () => { if (window.confirm(`Grant Starter Kit to ${selectedLabel || grantPlayerId}?`)) showGrantResult(await starterKitApi.grant(grantPlayerId, "GRANT STARTER KIT")); })}>Grant Starter Kit</button>
         </div>
         {selected && !selected.action_player_id && <p className="danger-note">Selected player has no Admin action ID, so CLI-backed grants are disabled.</p>}
         <details>
@@ -942,8 +940,8 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
           <label>Interval seconds<input type="number" min="60" max="3600" value={String(config.autoGrantIntervalSeconds)} onChange={(event) => setConfig({ ...config, autoGrantIntervalSeconds: Number(event.target.value) })} /></label>
           <label>Grant when<select value={config.grantWhen} onChange={(event) => setConfig({ ...config, grantWhen: event.target.value as StarterKitConfig["grantWhen"] })}><option value="first_seen">First seen</option><option value="first_online">First online</option></select></label>
           <button onClick={() => run(async () => { const result = await starterKitApi.eligible(); setEligible(result.rows || []); })}>Preview Eligible Players</button>
-          <button className="danger" disabled={!eligibleCount} onClick={() => run(async () => { const phrase = window.prompt("Type GRANT STARTER KIT TO ELIGIBLE PLAYERS to bulk grant."); if (phrase) setOutput(JSON.stringify(await starterKitApi.grantEligible(phrase), null, 2)); setHistory((await starterKitApi.history()).rows || []); })}>Grant to Eligible Players</button>
-          <button onClick={() => run(async () => setOutput(JSON.stringify(await starterKitApi.run("RUN STARTER KIT SCAN"), null, 2)))}>Run Auto Scan Now</button>
+          <button className="danger" disabled={!eligibleCount} onClick={() => run(async () => { const phrase = window.prompt("Type GRANT STARTER KIT TO ELIGIBLE PLAYERS to bulk grant."); if (phrase) showGrantResult(await starterKitApi.grantEligible(phrase)); setHistory((await starterKitApi.history()).rows || []); })}>Grant to Eligible Players</button>
+          <button onClick={() => run(async () => showGrantResult(await starterKitApi.run("RUN STARTER KIT SCAN")))}>Run Auto Scan Now</button>
         </div>
         {eligible.length > 0 && <DataTable rows={eligible} />}
       </section>
@@ -952,18 +950,57 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
         <h4>Grant History</h4>
         <div className="action-line">
           <input value={grantId} onChange={(event) => setGrantId(event.target.value)} placeholder="Failed grant id" />
-          <button onClick={() => run(async () => { if (window.confirm(`Retry Starter Kit grant ${grantId}?`)) setOutput(JSON.stringify(await starterKitApi.retry(grantId, "RETRY STARTER KIT"), null, 2)); })}>Retry Failed Grant</button>
+          <button onClick={() => run(async () => { if (window.confirm(`Retry Starter Kit grant ${grantId}?`)) showGrantResult(await starterKitApi.retry(grantId, "RETRY STARTER KIT")); })}>Retry Failed Grant</button>
           <button onClick={() => run(async () => setHistory((await starterKitApi.history()).rows || []))}>Refresh History</button>
         </div>
-        <DataTable rows={history} />
+        <DataTable rows={history} columns={["timestamp", "character_name", "action_player_id", "source", "version", "status", "summary"]} />
       </section>
     </div>
     {output && <pre className="mini-output">{output}</pre>}
+    {technicalOutput && <details><summary>Technical details</summary><pre className="mini-output">{technicalOutput}</pre></details>}
     <details>
       <summary>Raw Starter Kit JSON</summary>
       <pre className="mini-output">{JSON.stringify(config, null, 2)}</pre>
     </details>
   </section>;
+
+  function showGrantResult(result: Record<string, unknown>) {
+    setOutput(formatStarterKitGrantResult(result));
+    setTechnicalOutput(JSON.stringify(result, null, 2));
+  }
+}
+
+function formatStarterKitGrantResult(result: Record<string, unknown>) {
+  if (Array.isArray(result.results) && result.results.some((row) => row && typeof row === "object" && "status" in row)) {
+    const rows = result.results as Record<string, unknown>[];
+    const lines = [
+      `Starter Kit bulk grant finished: ${result.granted || 0} granted, ${result.skipped || 0} skipped, ${result.failed || 0} failed.`
+    ];
+    rows.slice(0, 20).forEach((row) => {
+      const name = row.character_name || row.action_player_id || row.playerId || "Unknown player";
+      lines.push(`${String(row.status || "unknown").toUpperCase()}: ${name} - ${row.summary || row.reason || ""}`);
+    });
+    return lines.join("\n");
+  }
+  const status = String(result.status || (result.ok ? "granted" : "failed"));
+  const heading = status === "granted" ? "Starter Kit grant completed." :
+    status === "partial_failed" ? "Starter Kit grant partially completed." :
+      status === "skipped" ? "Starter Kit grant skipped." : "Starter Kit grant failed.";
+  const lines = [heading, String(result.summary || "")].filter(Boolean);
+  if (Array.isArray(result.results)) {
+    for (const action of result.results as Record<string, unknown>[]) {
+      if (action.ok) lines.push(`OK: ${describeStarterKitAction(action)} granted`);
+      else lines.push(`FAIL: ${describeStarterKitAction(action)} failed: ${action.error || "unknown error"}${action.item ? " (use Admin Tools -> Item Search for exact item names)" : ""}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function describeStarterKitAction(action: Record<string, unknown>) {
+  const item = action.item as Record<string, unknown> | undefined;
+  if (item) return `${item.itemName || item.itemId || "Item"} x${item.quantity || 1}`;
+  if (action.operation === "adminAddXp") return `${action.amount || 0} XP`;
+  return String(action.operation || "Starter Kit action");
 }
 
 function StoragePanel({ onError }: { onError: (text: string) => void }) {

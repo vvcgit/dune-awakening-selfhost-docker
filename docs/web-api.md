@@ -143,8 +143,8 @@ Base path for the native RedBlink API: `/api`.
 | `/api/starter-kit/config` | GET | Starter Kit config | File-backed config from `runtime/generated/starter-kit.json`, default disabled |
 | `/api/starter-kit/config` | POST | Save Starter Kit config | Validates items/XP/version/repeat behavior/auto-grant settings and requires `SAVE STARTER KIT` |
 | `/api/starter-kit/grants` | GET | Starter Kit grants | File-backed grant history from `runtime/generated/starter-kit-grants.jsonl` |
-| `/api/starter-kit/history` | GET | Starter Kit history | Same file-backed grant history |
-| `/api/starter-kit/grant/:playerId` | POST | Manual Starter Kit grant | Requires `GRANT STARTER KIT`; executes `dune admin grant-item`, `grant-item-id`, and `award-xp` according to config |
+| `/api/starter-kit/history` | GET | Starter Kit history | Same file-backed grant history, normalized with `timestamp`, aggregate `status`, and short `summary` fields |
+| `/api/starter-kit/grant/:playerId` | POST | Manual Starter Kit grant | Requires `GRANT STARTER KIT`; executes `dune admin grant-item`, `grant-item-id`, and `award-xp` according to config; returns aggregate `granted`, `partial_failed`, or `failed` status plus raw per-action details |
 | `/api/starter-kit/eligible` | GET | Preview Starter Kit eligible players | Uses current player list `action_player_id`; skips missing admin IDs and already granted kit versions unless repeat grants are enabled |
 | `/api/starter-kit/grant-eligible` | POST | Bulk grant Starter Kit to eligible players | Requires `GRANT STARTER KIT TO ELIGIBLE PLAYERS`; grants one player at a time and returns per-player granted/skipped/failed rows |
 | `/api/starter-kit/retry/:grantId` | POST | Retry failed Starter Kit grant | Requires `RETRY STARTER KIT`; reruns the manual grant for failed history rows |

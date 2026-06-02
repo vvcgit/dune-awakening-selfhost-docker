@@ -52,8 +52,29 @@ export function starterKitHistory(config, limit = 100) {
     .filter(Boolean)
     .slice(-safeLimit)
     .map((line) => JSON.parse(line))
+    .map(normalizeHistoryRow)
     .reverse();
   return { rows };
+}
+
+function normalizeHistoryRow(row = {}) {
+  const status = row.status || (row.ok === true ? "granted" : row.ok === false ? "failed" : "unknown");
+  return {
+    ...row,
+    timestamp: row.timestamp || row.startedAt || row.finishedAt || "",
+    status,
+    summary: row.summary || summarizeStoredRow(row, status)
+  };
+}
+
+function summarizeStoredRow(row, status) {
+  if (row.reason) return `${status}: ${row.reason}`;
+  if (Array.isArray(row.results)) {
+    const successCount = row.results.filter((result) => result.ok).length;
+    const failureCount = row.results.length - successCount;
+    return `${successCount} succeeded, ${failureCount} failed`;
+  }
+  return status;
 }
 
 export function starterKitEligiblePlayers(config, players = []) {
@@ -160,8 +181,8 @@ export async function grantStarterKit(config, playerId, body = {}) {
       results.push({ ok: false, operation: "adminAddXp", amount: kit.xp, error: error.message || String(error) });
     }
   }
-  const ok = results.every((result) => result.ok);
-  const row = { id: grantId, playerId, action_player_id: playerId, actor_id: body.actorId || "", character_name: body.characterName || "", source: body.source || "manual", version: kit.version, status: ok ? "granted" : "failed", ok, startedAt, finishedAt: new Date().toISOString(), results };
+  const aggregate = summarizeActionResults(results);
+  const row = { id: grantId, playerId, action_player_id: playerId, actor_id: body.actorId || "", character_name: body.characterName || "", source: body.source || "manual", version: kit.version, status: aggregate.status, ok: aggregate.ok, summary: aggregate.summary, startedAt, finishedAt: new Date().toISOString(), results };
   appendGrant(config, row);
   return row;
 }
@@ -199,7 +220,7 @@ function eligibilityForPlayer(kit, history, player) {
   if (kit.grantWhen === "first_online" && String(player.online_status || "").toLowerCase() !== "online") {
     return { ...player, eligible: false, reason: "Not currently online" };
   }
-  if (!kit.allowRepeatGrants && history.some((row) => row.ok && row.version === kit.version && row.playerId === player.action_player_id)) {
+  if (!kit.allowRepeatGrants && history.some((row) => isSuccessfulGrant(row) && row.version === kit.version && row.playerId === player.action_player_id)) {
     return { ...player, eligible: false, reason: `Already granted version ${kit.version}` };
   }
   return { ...player, eligible: true, reason: "" };
@@ -217,19 +238,23 @@ function normalizePlayer(player = {}) {
 }
 
 function hasSuccessfulGrant(config, playerId, version) {
-  return starterKitHistory(config, 500).rows.some((row) => row.ok && row.version === version && row.playerId === playerId);
+  return starterKitHistory(config, 500).rows.some((row) => isSuccessfulGrant(row) && row.version === version && row.playerId === playerId);
+}
+
+function isSuccessfulGrant(row) {
+  return row?.status === "granted" || (row?.ok === true && !row?.status);
 }
 
 function skippedGrant(config, kit, player, reason, source) {
   const now = new Date().toISOString();
-  const row = { id: randomUUID(), playerId: player.action_player_id || "", action_player_id: player.action_player_id || "", actor_id: player.actor_id || "", character_name: player.character_name || "", source, version: kit.version, status: "skipped", ok: true, startedAt: now, finishedAt: now, reason, results: [] };
+  const row = { id: randomUUID(), playerId: player.action_player_id || "", action_player_id: player.action_player_id || "", actor_id: player.actor_id || "", character_name: player.character_name || "", source, version: kit.version, status: "skipped", ok: true, summary: `Skipped: ${reason}`, startedAt: now, finishedAt: now, reason, results: [] };
   appendGrant(config, row);
   return row;
 }
 
 function failedGrant(config, kit, player, reason, source) {
   const now = new Date().toISOString();
-  const row = { id: randomUUID(), playerId: player.action_player_id || "", action_player_id: player.action_player_id || "", actor_id: player.actor_id || "", character_name: player.character_name || "", source, version: kit.version, status: "failed", ok: false, startedAt: now, finishedAt: now, reason, results: [{ ok: false, error: reason }] };
+  const row = { id: randomUUID(), playerId: player.action_player_id || "", action_player_id: player.action_player_id || "", actor_id: player.actor_id || "", character_name: player.character_name || "", source, version: kit.version, status: "failed", ok: false, summary: `Failed: ${reason}`, startedAt: now, finishedAt: now, reason, results: [{ ok: false, error: reason }] };
   appendGrant(config, row);
   return row;
 }
@@ -242,6 +267,27 @@ function summarizeGrantResults(results) {
     failed: results.filter((row) => row.status === "failed").length,
     results
   };
+}
+
+function summarizeActionResults(results) {
+  const successCount = results.filter((result) => result.ok).length;
+  const failureCount = results.length - successCount;
+  const status = failureCount === 0 ? "granted" : successCount === 0 ? "failed" : "partial_failed";
+  const failed = results
+    .filter((result) => !result.ok)
+    .map((result) => `${describeAction(result)} failed: ${result.error || "unknown error"}`)
+    .slice(0, 3);
+  return {
+    ok: failureCount === 0,
+    status,
+    summary: `${successCount} succeeded, ${failureCount} failed${failed.length ? `; ${failed.join("; ")}` : ""}`
+  };
+}
+
+function describeAction(result) {
+  if (result.item) return `${result.item.itemName || result.item.itemId || "Item"} x${result.item.quantity || 1}`;
+  if (result.operation === "adminAddXp") return `${result.amount || 0} XP`;
+  return result.operation || "Starter Kit action";
 }
 
 function validateStarterKitItem(item = {}) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { enableStarterKit, grantEligibleStarterKits, grantStarterKit, runStarterKitAutoScan, saveStarterKitConfig, starterKitCapabilities, starterKitConfig, starterKitEligiblePlayers, validateStarterKitConfig } from "../src/starterKit.js";
@@ -85,6 +85,58 @@ test("starter kit repeat grants respect allowRepeatGrants", async () => {
   }
 });
 
+test("starter kit grant all successes records granted status and summary", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveStarterKitConfig(config, { enabled: true, version: "starter-kit-v1", xp: 10, items: [{ itemName: "Plant Fiber", quantity: 2, durability: 1 }] });
+    const result = await grantStarterKit(config, "RedBlink#75570", { confirmation: "GRANT STARTER KIT" });
+    assert.equal(result.status, "granted");
+    assert.equal(result.ok, true);
+    assert.match(result.summary, /2 succeeded, 0 failed/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("starter kit grant partial failures records partial_failed status and summary", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveStarterKitConfig(config, {
+      enabled: true,
+      version: "starter-kit-v1",
+      xp: 10,
+      items: [
+        { itemName: "fiber", quantity: 10, durability: 1 },
+        { itemName: "Cup of Water", quantity: 1, durability: 1 }
+      ]
+    });
+    const result = await grantStarterKit(config, "RedBlink#75570", { confirmation: "GRANT STARTER KIT" });
+    assert.equal(result.status, "partial_failed");
+    assert.equal(result.ok, false);
+    assert.match(result.summary, /2 succeeded, 1 failed/);
+    assert.match(result.summary, /fiber x10 failed: No item found for: fiber/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("starter kit grant all failures records failed status and no blank summary", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveStarterKitConfig(config, { enabled: true, version: "starter-kit-v1", xp: 0, items: [{ itemName: "fiber", quantity: 10, durability: 1 }] });
+    const result = await grantStarterKit(config, "RedBlink#75570", { confirmation: "GRANT STARTER KIT" });
+    assert.equal(result.status, "failed");
+    assert.equal(result.ok, false);
+    assert.match(result.summary, /0 succeeded, 1 failed/);
+    assert.ok(result.summary.length > 0);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("starter kit bulk grant returns per-player granted skipped and failed rows", async () => {
   const config = tempConfig();
   try {
@@ -131,4 +183,12 @@ function tempConfig() {
     generatedDir: resolve(repoRoot, "runtime/generated"),
     mockMode: true
   };
+}
+
+function writeCatalog(config) {
+  mkdirSync(resolve(config.repoRoot, "runtime/data"), { recursive: true });
+  writeFileSync(resolve(config.repoRoot, "runtime/data/admin-items.json"), JSON.stringify([
+    { id: "PlantFiber_1", name: "Plant Fiber", category: "materials" },
+    { id: "CupWater_1", name: "Cup of Water", category: "consumables" }
+  ]));
 }
