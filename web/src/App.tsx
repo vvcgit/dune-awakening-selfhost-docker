@@ -315,6 +315,7 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
   const [liveToolResult, setLiveToolResult] = useState("");
   const [xp, setXp] = useState("1000");
   const [message, setMessage] = useState("");
+  const [broadcastDuration, setBroadcastDuration] = useState("30");
   const [history, setHistory] = useState("");
   async function run(action: () => Promise<unknown>) {
     onError("");
@@ -349,7 +350,8 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
       <div className="action-row">
         <button className="danger" onClick={() => run(async () => window.confirm("Kick every online player? This publishes PlayerId='*'.") && setTask((await adminApi.kickAllOnline("KICK ALL ONLINE PLAYERS")).task))}>Kick All Online Players</button>
         <input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Broadcast or whisper message" />
-        <button onClick={() => run(async () => setLiveToolResult(JSON.stringify(await adminApi.broadcast(message, 30), null, 2)))}>Broadcast Publish Test</button>
+        <label className="inline-field">Duration seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
+        <button onClick={() => run(async () => setLiveToolResult(JSON.stringify(await adminApi.broadcast(message, Number(broadcastDuration || 30)), null, 2)))}>Broadcast Publish Test</button>
         <button className="danger" onClick={() => run(async () => window.confirm("Send shutdown broadcast publish test? In-game visibility is unverified.") && setLiveToolResult(JSON.stringify(await adminApi.shutdownBroadcast({ confirmation: "SHUTDOWN BROADCAST", delayMinutes: 15, shutdownType: "Restart" }), null, 2)))}>Shutdown Broadcast Publish Test</button>
         <button onClick={() => run(async () => setLiveToolResult(JSON.stringify(await adminApi.whisper(playerId, message), null, 2)))}>Whisper</button>
       </div>

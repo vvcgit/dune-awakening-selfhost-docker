@@ -14,17 +14,33 @@ export function validateBroadcastMessage(message) {
   return raw;
 }
 
-export function buildBroadcastCommand({ message, title = "Admin Broadcast", durationSec = 30 }) {
-  const body = validateBroadcastMessage(message);
+export function buildBroadcastCommand({ message, title = "Admin Broadcast", durationSec = 30, texts } = {}) {
+  const localizedText = validateLocalizedTexts(texts, message, title);
   const duration = validateInteger(durationSec, 1, 3600, "durationSec");
   return {
     ServerCommand: "ServiceBroadcast",
     BroadcastType: "Generic",
     BroadcastPayload: {
       BroadcastDuration: duration,
-      LocalizedText: [{ Key: "AdminBroadcast", Title: String(title || "Admin Broadcast").slice(0, 80), Body: body }]
+      LocalizedText: localizedText
     }
   };
+}
+
+export function validateLocalizedTexts(texts, message, title = "Admin Broadcast") {
+  if (Array.isArray(texts) && texts.length > 0) {
+    if (texts.length > 10) throw new Error("texts must contain 1-10 entries");
+    return texts.map((entry) => ({
+      Key: validateLocalizedTextField(entry?.Key || "AdminBroadcast", "Key", 120),
+      Title: validateLocalizedTextField(entry?.Title || title || "Admin Broadcast", "Title", 80),
+      Body: validateBroadcastMessage(entry?.Body)
+    }));
+  }
+  return [{
+    Key: "AdminBroadcast",
+    Title: validateLocalizedTextField(title || "Admin Broadcast", "Title", 80),
+    Body: validateBroadcastMessage(message)
+  }];
 }
 
 export function buildShutdownBroadcastCommand({ shutdownType = "Restart", delayMinutes = 15, frequency = 60, duration = 30, cancel = false }) {
@@ -100,6 +116,14 @@ function validateInteger(value, min, max, label) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${label} must be an integer ${min}-${max}`);
   return n;
+}
+
+function validateLocalizedTextField(value, label, maxLength) {
+  const raw = String(value || "").trim();
+  if (raw.length < 1 || raw.length > maxLength || /[\u0000-\u001f]/.test(raw)) {
+    throw new Error(`${label} must be 1-${maxLength} printable characters`);
+  }
+  return raw;
 }
 
 function validateShutdownType(value) {
