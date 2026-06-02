@@ -122,7 +122,8 @@ main { padding: 22px; min-width: 0; }
   max-height: 380px;
 }
 .concise-output { max-height: 180px; }
-.technical-details { margin-top: 12px; }
+.technical-details { display: none; margin-top: 12px; }
+body.debug .technical-details { display: block; }
 .technical-details summary {
   cursor: pointer;
   color: #ffd08a;
@@ -137,7 +138,8 @@ main { padding: 22px; min-width: 0; }
 .drawer { border-left: 1px solid #302b25; padding: 12px; color: #d9c8aa; }
 .gauge { display: grid; gap: 4px; background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 12px; }
 .service-table { display: grid; gap: 10px; margin-top: 14px; }
-.service-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.service-actions, .service-card .service-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.service-actions button, .service-actions .button-link { width: auto; white-space: nowrap; }
 .home-health { display: grid; gap: 16px; }
 .dashboard-band { display: grid; gap: 10px; }
 .dashboard-band h3 { margin: 0; color: #ffd08a; }
@@ -159,3 +161,21 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
 }
+
+.toggle-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.toggle-row button { width: auto; }
+.map-canvas {
+  position: relative;
+  height: 520px;
+  border: 1px solid #302b25;
+  border-radius: 8px;
+  background: #10151d;
+  background-image: var(--map-image);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+.muted { color: #ad9f89; }
+.planned-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.planned-card { background: #14171a; border: 1px dashed #514232; border-radius: 8px; padding: 14px; display: grid; gap: 6px; }
+.starter-items-table button { padding: 6px 10px; }

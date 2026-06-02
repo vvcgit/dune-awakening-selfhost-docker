@@ -1,7 +1,12 @@
 export function PortChecklist({ text }: { text: string }) {
   const rows = parsePorts(text);
+  const warnings = parseNetworkWarnings(text);
   return <section className="action-section">
     <h4>Ports / Listeners</h4>
+    {warnings.map((warning, index) => <article className="warning-panel action-section" key={`${warning}-${index}`}>
+      <strong>Network Warning</strong>
+      <p>{warning}</p>
+    </article>)}
     {rows.length ? <div className="table-wrap"><table><thead><tr><th>Name</th><th>Port</th><th>Protocol</th><th>Status</th><th>Details</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.name}-${index}`}><td>{row.name}</td><td>{row.port}</td><td>{row.protocol}</td><td><span className={`badge badge-${row.kind}`}>{row.status}</span></td><td>{row.detail}</td></tr>)}</tbody></table></div> : <p>Run port checks to see listener status.</p>}
     <details className="technical-details"><summary>Advanced port output</summary><pre className="mini-output">{text || "Run port checks to see listener status."}</pre></details>
   </section>;
@@ -9,24 +14,37 @@ export function PortChecklist({ text }: { text: string }) {
 
 function parsePorts(text: string) {
   const seen = new Set<string>();
-  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter((line) => /\d{2,5}/.test(line)).slice(0, 40).map((line) => {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter((line) => {
+    if (!/\b\d{2,5}\b/.test(line)) return false;
+    if (/battlegroup|advertised ip|local bind|public mode|private ip|in-game ping|server ip/i.test(line)) return false;
+    return /\b(udp|tcp)\b/i.test(line) || /\b(listen|listening|port|open|ready|ok)\b/i.test(line);
+  }).slice(0, 60).map((line) => {
     const portToken = line.match(/\b(\d{2,5})(?:\/(udp|tcp))?\b/i);
     const port = portToken?.[1] || "";
     const protocol = (portToken?.[2] || line.match(/\b(udp|tcp)\b/i)?.[1] || "").toUpperCase();
-    const status = /fail|closed|missing|error|down/i.test(line) ? "Failed" : /warn|not ready|waiting/i.test(line) ? "Warning" : /open|listen|listening|ok|ready|up/i.test(line) ? "Ready" : "Checked";
+    if (!protocol || !port) return null;
+    const status = /fail|closed|missing|error|down/i.test(line) ? "Failed" : /warn|not ready|waiting/i.test(line) ? "Attention Needed" : /open|listen|listening|ok|ready|up/i.test(line) ? "Ready" : "Checked";
     const beforePort = portToken ? line.slice(0, portToken.index).trim() : line;
     const name = friendlyPortName(beforePort || line, port, protocol);
     const key = `${name}-${port}-${protocol}`;
     if (seen.has(key)) return null;
     seen.add(key);
-    return { name, port, protocol, status, detail: status === "Ready" ? "Listening" : line, kind: status === "Failed" ? "fail" : status === "Warning" ? "warn" : "pass" };
+    return { name, port, protocol, status, detail: status === "Ready" ? "Listening" : cleanDetail(line), kind: status === "Failed" ? "fail" : status === "Attention Needed" ? "warn" : "pass" };
   }).filter(Boolean) as { name: string; port: string; protocol: string; status: string; detail: string; kind: string }[];
+}
+
+function parseNetworkWarnings(text: string) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /advertised ip|public mode|private ip|local bind|in-game ping/i.test(line)).map(cleanDetail).slice(0, 4);
+}
+
+function cleanDetail(line: string) {
+  return line.replace(/^OK\s+/i, "").replace(/^WARN\s+/i, "").replace(/^FAIL\s+/i, "").replace(/\s+/g, " ").trim();
 }
 
 function friendlyPortName(raw: string, port: string, protocol: string) {
   const normalized = raw.replace(/^ok\s+/i, "").replace(/\blistening\b.*$/i, "").replace(/[:=-]/g, " ").trim().toLowerCase();
   const byPort: Record<string, string> = {
-    "15432/tcp": "Postgres Local",
+    "15432/tcp": "Postgres",
     "32573/tcp": "RabbitMQ Admin",
     "31982/tcp": "RabbitMQ Game",
     "31983/tcp": "RabbitMQ Game HTTP",
@@ -42,7 +60,7 @@ function friendlyPortName(raw: string, port: string, protocol: string) {
   if (/rabbit.*game.*http/.test(normalized)) return "RabbitMQ Game HTTP";
   if (/rabbit.*game/.test(normalized)) return "RabbitMQ Game";
   if (/rabbit.*admin/.test(normalized)) return "RabbitMQ Admin";
-  if (/postgres/.test(normalized)) return "Postgres Local";
+  if (/postgres/.test(normalized)) return "Postgres";
   if (/director/.test(normalized)) return "Director";
   return raw.replace(/\s+/g, " ").trim() || "Listener";
 }

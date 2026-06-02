@@ -6,13 +6,15 @@ import { TaskProgress } from "./TaskProgress";
 import { CommandPreview } from "./CommandPreview";
 
 const steps = ["Welcome", "Host Check", "Docker Setup", "Runtime Location", "Server Identity", "Funcom Token", "Ports", "Review", "Install", "Finish"];
+const regions = ["Europe", "North America", "South America", "Asia", "Oceania", "Africa"];
+type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; SERVER_PROVIDER: string; STEAM_APP_ID: string };
 
 export function SetupWizard() {
   const [step, setStep] = useState(0);
   const [checks, setChecks] = useState<Check[]>([]);
   const [task, setTask] = useState<Task | null>(null);
   const [token, setToken] = useState("");
-  const [config, setConfig] = useState({ SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe Test", SERVER_IP: "auto", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" });
+  const [config, setConfig] = useState<SetupConfig>({ SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" });
 
   async function runPreflight() {
     const result = await setupApi.preflight();
@@ -47,6 +49,7 @@ export function SetupWizard() {
         </>}
         {step === 1 && <>
           <h2>Host Check</h2>
+          <p className="muted">If this server is already running, some ports may show as in use by the current stack. Treat that as normal unless the check names an unrelated process.</p>
           <button onClick={runPreflight}>Run Checks</button>
           <div className="check-grid">{checks.map((check) => <PreflightCheckCard key={check.name} check={check} />)}</div>
         </>}
@@ -62,7 +65,12 @@ export function SetupWizard() {
         {step === 4 && <>
           <h2>Server Identity</h2>
           <div className="setup-form-grid">
-            {Object.entries(config).map(([key, value]) => <label key={key}>{friendlyConfigLabel(key)}<input value={value} onChange={(event) => setConfig({ ...config, [key]: event.target.value })} /></label>)}
+            <label>Server title<input value={config.SERVER_TITLE} onChange={(event) => setConfig({ ...config, SERVER_TITLE: event.target.value })} /></label>
+            <label>Region<select value={config.SERVER_REGION} onChange={(event) => setConfig({ ...config, SERVER_REGION: event.target.value })}>{regions.map((region) => <option key={region} value={region}>{region}</option>)}</select></label>
+            <label>Install mode<select value={config.SERVER_IP_MODE} onChange={(event) => setConfig({ ...config, SERVER_IP_MODE: event.target.value })}><option value="public">Public</option><option value="local">Local</option></select></label>
+            <label>Server IP<input value={config.SERVER_IP} onChange={(event) => setConfig({ ...config, SERVER_IP: event.target.value })} /></label>
+            <label>Provider<input value={config.SERVER_PROVIDER} onChange={(event) => setConfig({ ...config, SERVER_PROVIDER: event.target.value })} /></label>
+            <label>Steam app ID<input value={config.STEAM_APP_ID} onChange={(event) => setConfig({ ...config, STEAM_APP_ID: event.target.value })} /></label>
           </div>
         </>}
         {step === 5 && <>
@@ -72,7 +80,25 @@ export function SetupWizard() {
         </>}
         {step === 6 && <>
           <h2>Ports and Firewall</h2>
-          <p>Required ports include 7777/udp, 7778/udp, 7888/udp, 7889/udp, 31982/tcp, 31983/tcp, and internal admin ports.</p>
+          <div className="action-sections">
+            <section className="action-section">
+              <h4>Admin Panel</h4>
+              <p>Arrakis Server Console listens on 8088/tcp by default. Keep it local, VPN-only, or protected by a reverse proxy/firewall.</p>
+            </section>
+            <section className="action-section">
+              <h4>Game Client Ports</h4>
+              <p>Game client UDP ports start at 7777 and increment sequentially for each game server/map. Overmap commonly uses 7777 and Survival 1 commonly uses 7778.</p>
+            </section>
+            <section className="action-section">
+              <h4>Server-to-Server / IGW Ports</h4>
+              <p>IGW/S2S UDP ports start at 7888 and increment sequentially for each game server/map. These ranges must not overlap with game client ports.</p>
+            </section>
+            <section className="action-section">
+              <h4>Internal Services</h4>
+              <p>RabbitMQ Game uses 31982/tcp and 31983/tcp. Postgres and other internal ports should not be exposed publicly unless intentionally configured.</p>
+            </section>
+          </div>
+          <p className="danger-note">Additional deployed maps or sietches may require additional sequential game and IGW ports.</p>
         </>}
         {step === 7 && <>
           <h2>Review</h2>
@@ -82,6 +108,7 @@ export function SetupWizard() {
               <ReviewGrid items={[
                 ["Title", config.SERVER_TITLE],
                 ["Region", config.SERVER_REGION],
+                ["Mode", titleCase(config.SERVER_IP_MODE)],
                 ["Server IP", config.SERVER_IP],
                 ["Provider", config.SERVER_PROVIDER],
                 ["Steam App ID", config.STEAM_APP_ID]
@@ -144,12 +171,6 @@ function ReviewGrid({ items }: { items: [string, string][] }) {
   </div>)}</div>;
 }
 
-function friendlyConfigLabel(key: string) {
-  return {
-    SERVER_TITLE: "Server title",
-    SERVER_REGION: "Region",
-    SERVER_IP: "Server IP",
-    SERVER_PROVIDER: "Provider",
-    STEAM_APP_ID: "Steam app ID"
-  }[key] || key;
+function titleCase(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }

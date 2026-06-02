@@ -15,15 +15,16 @@ export function ReadinessTimeline({ text }: { text: string }) {
 }
 
 function parseChecks(text: string) {
-  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 18).map((line) => {
-    const status = /fail|error|not ready|missing|down/i.test(line) ? "Failed" : /warn|waiting|starting|partial/i.test(line) ? "Warning" : /ok|ready|healthy|running|up|pass|found/i.test(line) ? "Ready" : "Checked";
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter((line) => !/^=+|checks?$|readiness/i.test(line)).slice(0, 40).map((line) => {
+    const status = /fail|error|not ready|missing|down/i.test(line) ? "Failed" : /warn|waiting|starting|partial|wait/i.test(line) ? "Attention Needed" : /ok|ready|healthy|running|up|pass|found/i.test(line) ? "Ready" : "Checked";
+    const name = friendlyCheckName(line);
     return {
-      name: line.split(/[:|-]/)[0]?.trim() || "Readiness check",
-      detail: line,
+      name,
+      detail: detailForCheck(line, name),
       status,
       kind: status === "Ready" || status === "Checked" ? "pass" : status === "Failed" ? "fail" : "warn"
     };
-  });
+  }).filter((check) => check.name);
 }
 
 function groupChecks(checks: ReturnType<typeof parseChecks>) {
@@ -46,4 +47,30 @@ function groupChecks(checks: ReturnType<typeof parseChecks>) {
     "RabbitMQ / FLS Checks": [],
     "Other Checks": []
   });
+}
+
+function friendlyCheckName(line: string) {
+  return line
+    .replace(/^(OK|PASS|READY|WARN|WAIT|FAIL|FAILED|ERROR|MISSING)\s+/i, "")
+    .replace(/^container\s+/i, "")
+    .replace(/^listener\s+/i, "")
+    .replace(/^database\s+/i, "Database ")
+    .replace(/^tcp\s+([0-9]+)\s+/i, "TCP $1 ")
+    .replace(/^udp\s+([0-9]+)\s+/i, "UDP $1 ")
+    .replace(/dune-postgres/gi, "Dune Postgres")
+    .replace(/dune-rmq-admin/gi, "RabbitMQ Admin")
+    .replace(/dune-rmq-game/gi, "RabbitMQ Game")
+    .replace(/dune-text-router/gi, "Text Router")
+    .replace(/dune-director/gi, "Dune Director")
+    .replace(/dune-server-gateway/gi, "Gateway")
+    .replace(/dune-server-survival-1/gi, "Survival 1")
+    .replace(/dune-server-overmap/gi, "Overmap")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detailForCheck(line: string, name: string) {
+  if (/^OK|^PASS|^READY/i.test(line)) return "";
+  return line.replace(name, "").replace(/\s+/g, " ").trim();
 }

@@ -12,7 +12,7 @@ Goal: remove the remaining "CLI wrapper" feel from normal workflows without chan
 - Services: friendly service names and compact side-by-side actions.
 - Players: structured player summary and capability badges only by default, raw profile data collapsed.
 - Admin Tools: player selector, structured catalog/history displays, less cramped global tools. Keep broadcast experimental.
-- Live Map: friendlier marker labels and optional map image if licensing/calibration are verified.
+- Live Map: friendlier marker labels and Hagga Basin map background; marker placement remains approximate until coordinate calibration is verified.
 - Logs: friendly service names and remove redundant free-text service field.
 - Settings: structured runtime/file checklist only by default.
 
@@ -40,7 +40,7 @@ Goal: replace free-text workflows with selectors and structured result tables.
 
 Goal: make map operations understandable without exposing raw command text.
 
-- Live Map: evaluate compatible map image licensing and coordinate calibration before plotting over a background.
+- Live Map: complete coordinate calibration for the Hagga Basin background image before presenting marker placement as exact.
 - Friendly marker names for vehicles/classes; raw class paths only in details/tooltips.
 - Maps page: map table and edit panel for mode, memory, name/password, and safe per-map settings.
 - Inspect manager support for global UserEngine, per-map UserGame overrides, memory defaults, second map/survival support, and revert-to-default flows.
@@ -79,4 +79,4 @@ Goal: close remaining parity gaps without guessing.
 - Broadcast remains Partial/Experimental: RabbitMQ publish and history logging are verified, but in-game display is not working/verified.
 - Starter Kit auto-grant is partial: it runs as a web-admin scanner, not a standalone durable service.
 - Market automation remains blocked until a RedBlink-compatible market automation runtime exists.
-- Live Map currently supports marker/list views without calibrated background-map placement.
+- Phase 12A2 completed low-risk selector/table cleanup for Home, Setup, Server Control, Services, Players, Admin Tools, Live Map, Starter Kit, Backups, Logs, Updates, and Settings. Remaining 12B-12F backend-heavy items are intentionally deferred until CLI behavior and safety requirements are verified.

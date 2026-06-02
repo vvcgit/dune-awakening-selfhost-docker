@@ -827,7 +827,7 @@ async function starterKitAutoTick() {
 
 async function writeConfig(req, res) {
   const body = await readJson(req);
-  const allowed = ["SERVER_IP", "SERVER_TITLE", "SERVER_REGION", "SERVER_PROVIDER", "STEAM_APP_ID", "BATTLEGROUP_ID"];
+  const allowed = ["SERVER_IP", "SERVER_IP_MODE", "SERVER_TITLE", "SERVER_REGION", "SERVER_PROVIDER", "STEAM_APP_ID", "BATTLEGROUP_ID"];
   const lines = [];
   for (const key of allowed) {
     if (body[key] !== undefined) lines.push(`${key}=${quoteEnv(String(body[key]))}`);
