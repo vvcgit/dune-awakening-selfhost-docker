@@ -122,6 +122,46 @@ Common beginner tasks:
 | Edit map settings | `Sietches` -> `Edit Map` | `dune sietches ...` |
 | Admin actions | `Admin Tools` | `dune admin ...` |
 
+## Optional Web Admin
+
+This repo also includes an optional web admin UI named Arrakis Server Console. It wraps the same RedBlink CLI/runtime, direct Postgres, and verified RabbitMQ paths used by the command-line tools.
+
+Start it from the repo root:
+
+```bash
+docker compose -f docker-compose.web.yml up -d --build
+```
+
+Then open:
+
+```text
+http://SERVER_IP:8088
+```
+
+The generated admin password is stored at:
+
+```text
+runtime/secrets/admin-web-password.txt
+```
+
+Security notes:
+
+- Do not expose the web admin publicly.
+- The compose file mounts `/var/run/docker.sock`, which gives the web container broad Docker control.
+- State-changing requests require login and CSRF protection.
+- Direct database writes create a backup first and require backend confirmation phrases.
+- Blocked features such as Whisper, market automation, automatic Starter Kit scanning, and blueprint/base imports show explicit unsupported reasons instead of fake success.
+
+Detailed docs:
+
+- `docs/web-deployment.md`
+- `docs/web-ui.md`
+- `docs/web-admin-features.md`
+- `docs/web-security.md`
+- `docs/web-testing.md`
+- `docs/web-smoke-checklist.md`
+- `docs/web-release-checklist.md`
+
 ## Features Supported
 
 | Feature | Beginner access | Advanced command / location |

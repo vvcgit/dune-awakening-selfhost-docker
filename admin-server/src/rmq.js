@@ -48,6 +48,7 @@ export function buildShutdownBroadcastCommand({ shutdownType = "Restart", delayM
 }
 
 export async function publishServerCommand(config, fields, label = "web-admin") {
+  const safeLabel = validatePublishLabel(label);
   const inner = JSON.stringify(fields);
   const outer = JSON.stringify({
     Version: 2,
@@ -55,10 +56,16 @@ export async function publishServerCommand(config, fields, label = "web-admin") 
     MessageContent: inner
   });
   const outerB64 = Buffer.from(outer, "utf8").toString("base64");
-  const evalCode = `Outer = base64:decode(<<"${outerB64}">>), XName = rabbit_misc:r(<<"/">>, exchange, <<"heartbeats">>), X = rabbit_exchange:lookup_or_die(XName), MsgId = list_to_binary("web-${label}-" ++ integer_to_list(erlang:system_time(millisecond))), P = {list_to_atom("P_basic"), <<"Content">>, undefined, [], undefined, undefined, undefined, undefined, undefined, MsgId, undefined, undefined, <<"fls">>, <<"fls_backend">>, undefined}, Content = rabbit_basic:build_content(P, Outer), {ok, Msg} = rabbit_basic:message(XName, <<"notifications">>, Content), Result = rabbit_queue_type:publish_at_most_once(X, Msg), io:format("publish=~p exchange=heartbeats routing=notifications app_id=fls_backend user_id=fls label=${label}~n", [Result]).`;
+  const evalCode = `Outer = base64:decode(<<"${outerB64}">>), XName = rabbit_misc:r(<<"/">>, exchange, <<"heartbeats">>), X = rabbit_exchange:lookup_or_die(XName), MsgId = list_to_binary("web-${safeLabel}-" ++ integer_to_list(erlang:system_time(millisecond))), P = {list_to_atom("P_basic"), <<"Content">>, undefined, [], undefined, undefined, undefined, undefined, undefined, MsgId, undefined, undefined, <<"fls">>, <<"fls_backend">>, undefined}, Content = rabbit_basic:build_content(P, Outer), {ok, Msg} = rabbit_basic:message(XName, <<"notifications">>, Content), Result = rabbit_queue_type:publish_at_most_once(X, Msg), io:format("publish=~p exchange=heartbeats routing=notifications app_id=fls_backend user_id=fls label=${safeLabel}~n", [Result]).`;
   const output = await dockerExec(["exec", RMQ_CONTAINER, "rabbitmqctl", "eval", evalCode], config.commandTimeoutMs);
   if (!/publish=ok/.test(output.stdout)) throw new Error("RabbitMQ publish did not report publish=ok");
   return output;
+}
+
+export function validatePublishLabel(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z0-9_-]{1,80}$/.test(raw)) return raw;
+  throw new Error("Invalid RabbitMQ publish label");
 }
 
 function commandAuthToken(repoRoot) {

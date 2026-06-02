@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAuth } from "../src/auth.js";
+import { createAuth, clearSessionCookie, setSessionCookie } from "../src/auth.js";
 
 test("auth creates readable signed sessions", () => {
   const auth = createAuth({ sessionSecret: "secret", adminPassword: "admin", authDisabled: false });
@@ -29,12 +29,29 @@ test("auth accepts state-changing requests with CSRF token", () => {
   assert.equal(res.status, null);
 });
 
+test("session cookies can opt into Secure for production/container deployments", () => {
+  const res = fakeResponse();
+  setSessionCookie(res, { cookie: "abc.sig" }, { secureCookies: true });
+  assert.match(res.headers["Set-Cookie"], /HttpOnly/);
+  assert.match(res.headers["Set-Cookie"], /SameSite=Lax/);
+  assert.match(res.headers["Set-Cookie"], /Secure/);
+
+  clearSessionCookie(res, { secureCookies: true });
+  assert.match(res.headers["Set-Cookie"], /Max-Age=0/);
+  assert.match(res.headers["Set-Cookie"], /Secure/);
+});
+
 function fakeResponse() {
   return {
     status: null,
+    headers: {},
     body: "",
-    writeHead(status) {
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    writeHead(status, headers = {}) {
       this.status = status;
+      Object.assign(this.headers, headers);
     },
     end(body) {
       this.body = body;

@@ -13,6 +13,7 @@ import { redact } from "./redact.js";
 import { listCatalogItems, resolveCatalogItem } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishServerCommand } from "./rmq.js";
 import { enableStarterKit, grantStarterKit, retryStarterKitGrant, saveStarterKitConfig, starterKitCapabilities, starterKitConfig, starterKitHistory } from "./starterKit.js";
+import { readJsonBody, safeStaticTarget } from "./httpSafety.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -35,7 +36,7 @@ createServer(async (req, res) => {
     }
     serveStatic(req, res);
   } catch (error) {
-    json(res, 500, { error: redact(error.message || error) });
+    json(res, error.statusCode || 500, { error: redact(error.message || error) });
   }
 }).listen(config.port, config.host, () => {
   console.log(`${config.appName} API listening on http://${config.host}:${config.port}`);
@@ -57,12 +58,14 @@ async function handleApi(req, res) {
     const body = await readJson(req);
     if (!config.authDisabled && !auth.passwordMatches(body.password)) return json(res, 401, { error: "Invalid password" });
     const session = auth.makeSession();
-    setSessionCookie(res, session);
+    setSessionCookie(res, session, config);
     audit(config, req, "auth.login");
     return json(res, 200, { authenticated: true, csrfToken: session.csrf });
   }
   if (path === "/api/auth/logout" && req.method === "POST") {
-    clearSessionCookie(res);
+    const session = auth.requireAuth(req, res);
+    if (!session) return;
+    clearSessionCookie(res, config);
     audit(config, req, "auth.logout");
     return json(res, 200, { ok: true });
   }
@@ -171,13 +174,25 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/storage\/[^/]+\/export$/)) return exportJson(res, `storage-${decodeURIComponent(path.split("/")[3])}.json`, () => duneDb.storageItems(db, decodeURIComponent(path.split("/")[3])));
   if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db));
   if (path.match(/^\/api\/bases\/[^/]+$/) && req.method === "GET") return dbJson(res, async () => ({ base: (await duneDb.listBases(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
-  if (path.match(/^\/api\/bases\/[^/]+\/export$/)) return exportJson(res, `base-${decodeURIComponent(path.split("/")[3])}.blueprint.json`, () => duneDb.exportBaseAsBlueprint(db, decodeURIComponent(path.split("/")[3])));
-  if (path.match(/^\/api\/bases\/[^/]+\/export-blueprint$/) && req.method === "POST") return dbJson(res, () => duneDb.exportBaseAsBlueprint(db, decodeURIComponent(path.split("/")[3])));
+  if (path.match(/^\/api\/bases\/[^/]+\/export$/)) {
+    const id = decodeURIComponent(path.split("/")[3]);
+    audit(config, req, "bases.export", { id, format: "blueprint" });
+    return exportJson(res, `base-${id}.blueprint.json`, () => duneDb.exportBaseAsBlueprint(db, id));
+  }
+  if (path.match(/^\/api\/bases\/[^/]+\/export-blueprint$/) && req.method === "POST") {
+    const id = decodeURIComponent(path.split("/")[3]);
+    audit(config, req, "bases.export-blueprint", { id });
+    return dbJson(res, () => duneDb.exportBaseAsBlueprint(db, id));
+  }
   if (path === "/api/bases/import" && req.method === "POST") return blockedImportRoute(req, res, "bases.import", "IMPORT BASE", "Base import remains blocked: safe ownership, position, entity ID remapping, and live-service collision rules are not verified for RedBlink databases.");
   if (path.match(/^\/api\/bases\/[^/]+$/) && req.method === "DELETE") return blockedImportRoute(req, res, "bases.delete", "DELETE BASE", "Base delete remains blocked: deleting a full base requires verified building/placeable/inventory/object graph deletion rules.");
   if (path === "/api/blueprints") return dbJson(res, () => duneDb.listBlueprints(db));
   if (path.match(/^\/api\/blueprints\/[^/]+$/) && req.method === "GET") return dbJson(res, async () => ({ blueprint: (await duneDb.listBlueprints(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
-  if (path.match(/^\/api\/blueprints\/[^/]+\/export$/)) return exportJson(res, `blueprint-${decodeURIComponent(path.split("/")[3])}.json`, () => duneDb.exportBlueprintFull(db, decodeURIComponent(path.split("/")[3])));
+  if (path.match(/^\/api\/blueprints\/[^/]+\/export$/)) {
+    const id = decodeURIComponent(path.split("/")[3]);
+    audit(config, req, "blueprints.export", { id });
+    return exportJson(res, `blueprint-${id}.json`, () => duneDb.exportBlueprintFull(db, id));
+  }
   if (path === "/api/blueprints/import" && req.method === "POST") return blockedImportRoute(req, res, "blueprints.import", "IMPORT BLUEPRINT", "Blueprint import remains blocked: arrakis-admin import requires verified offline-player backpack ownership, blueprint item stat shape, and ID remapping rules that RedBlink does not expose through a safe CLI path.");
   if (path.match(/^\/api\/blueprints\/[^/]+$/) && req.method === "DELETE") return blockedImportRoute(req, res, "blueprints.delete", "DELETE BLUEPRINT", "Blueprint delete remains blocked: safe item/blueprint graph deletion rules are not verified.");
   if (path.match(/^\/api\/blueprints\/[^/]+\/clone$/) && req.method === "POST") return blockedImportRoute(req, res, "blueprints.clone", "CLONE BLUEPRINT", "Blueprint clone remains blocked: clone requires verified blueprint item creation, stat wiring, and inventory ownership rules.");
@@ -226,8 +241,8 @@ async function handleApi(req, res) {
   if (path === "/api/sietches/update" && req.method === "POST") return sietchesUpdateRoute(req, res);
   if (path === "/api/deepdesert") return commandJson(res, "deepdesertStatus");
   if (path === "/api/deepdesert/update" && req.method === "POST") return deepDesertUpdateRoute(req, res);
-  if (path === "/api/settings") return json(res, 200, await setupState());
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
+  if (path === "/api/settings") return json(res, 200, await setupState());
 
   return json(res, 404, { error: "Not found" });
 }
@@ -724,10 +739,7 @@ async function saveToken(req, res) {
 }
 
 async function readJson(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  return readJsonBody(req, config.maxJsonBytes);
 }
 
 function quoteEnv(value) {
@@ -744,12 +756,8 @@ function mockCommand(operation) {
 }
 
 function serveStatic(req, res) {
-  const dist = resolve(config.staticDir);
   let path = new URL(req.url || "/", "http://localhost").pathname;
-  if (path === "/") path = "/index.html";
-  const file = resolve(dist, `.${path}`);
-  const fallback = resolve(dist, "index.html");
-  const target = existsSync(file) ? file : fallback;
+  const target = safeStaticTarget(config.staticDir, path);
   if (!existsSync(target)) {
     json(res, 200, { app: config.appName, message: "Frontend is not built yet. Run npm install && npm run build in web/." });
     return;

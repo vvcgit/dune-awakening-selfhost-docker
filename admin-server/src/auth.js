@@ -64,12 +64,14 @@ export function createAuth(config) {
   return { makeSession, readSession, passwordMatches, requireAuth };
 }
 
-export function setSessionCookie(res, session) {
-  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`);
+export function setSessionCookie(res, session, config = {}) {
+  const secure = config.secureCookies ? "; Secure" : "";
+  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secure}`);
 }
 
-export function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", "asc_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+export function clearSessionCookie(res, config = {}) {
+  const secure = config.secureCookies ? "; Secure" : "";
+  res.setHeader("Set-Cookie", `asc_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
 }
 
 export function json(res, status, body, headers = {}) {

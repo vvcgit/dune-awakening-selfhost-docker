@@ -8,6 +8,7 @@ export function loadConfig() {
   const repoRoot = resolve(process.env.DUNE_DOCKER_DIR || process.env.RUNTIME_DIR || process.cwd());
   const generatedDir = resolve(repoRoot, "runtime/generated");
   const secretsDir = resolve(repoRoot, "runtime/secrets");
+  const secureCookieEnv = process.env.ADMIN_SECURE_COOKIES;
   mkdirSync(generatedDir, { recursive: true });
   mkdirSync(secretsDir, { recursive: true });
 
@@ -18,6 +19,7 @@ export function loadConfig() {
     host: process.env.ADMIN_BIND_HOST || "0.0.0.0",
     port: Number(process.env.ADMIN_BIND_PORT || 8088),
     authDisabled: process.env.ADMIN_AUTH_DISABLED === "1",
+    secureCookies: secureCookieEnv === undefined ? process.env.NODE_ENV === "production" : secureCookieEnv === "1",
     allowHostBootstrap: process.env.ALLOW_HOST_BOOTSTRAP === "true",
     mockMode: process.env.ADMIN_MOCK_MODE === "1",
     sessionSecret: getOrCreateSecret(resolve(secretsDir, "admin-web-session-secret.txt"), 48),
@@ -26,6 +28,7 @@ export function loadConfig() {
     secretsDir,
     auditLog: resolve(generatedDir, "web-admin-audit.jsonl"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
+    maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "web/dist")
   };
@@ -51,6 +54,7 @@ export function publicConfig(config) {
     appName: config.appName,
     repoRoot: config.repoRoot,
     authDisabled: config.authDisabled,
+    secureCookies: config.secureCookies,
     allowHostBootstrap: config.allowHostBootstrap,
     mockMode: config.mockMode
   };

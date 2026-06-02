@@ -6,15 +6,31 @@ services:
     image: arrakis-server-console:dev
     container_name: arrakis-server-console
     restart: unless-stopped
+    # Host networking lets the console reach RedBlink defaults such as
+    # Postgres on 127.0.0.1:15432 and bind ADMIN_BIND_PORT directly.
     network_mode: host
     environment:
       DUNE_DOCKER_DIR: /repo
-      ADMIN_BIND_HOST: 0.0.0.0
-      ADMIN_BIND_PORT: 8088
+      ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-0.0.0.0}"
+      ADMIN_BIND_PORT: "${ADMIN_BIND_PORT:-8088}"
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
+      ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
+      ADMIN_COMMAND_TIMEOUT_MS: "${ADMIN_COMMAND_TIMEOUT_MS:-120000}"
+      ADMIN_MAX_JSON_BYTES: "${ADMIN_MAX_JSON_BYTES:-2097152}"
       ALLOW_HOST_BOOTSTRAP: "${ALLOW_HOST_BOOTSTRAP:-false}"
       ADMIN_MOCK_MODE: "${ADMIN_MOCK_MODE:-0}"
       ADMIN_STATIC_DIR: /app/web-dist
+      ADMIN_DATABASE_URL: "${ADMIN_DATABASE_URL:-}"
+      DUNE_DB_HOST: "${DUNE_DB_HOST:-}"
+      DUNE_DB_PORT: "${DUNE_DB_PORT:-}"
+      DUNE_DB_NAME: "${DUNE_DB_NAME:-}"
+      DUNE_DB_USER: "${DUNE_DB_USER:-}"
+      DUNE_DB_PASSWORD: "${DUNE_DB_PASSWORD:-}"
+      DUNE_COMMAND_AUTH_TOKEN: "${DUNE_COMMAND_AUTH_TOKEN:-}"
     volumes:
       - ./:/repo
+      # WARNING: mounting the Docker socket gives this container broad control
+      # over the host Docker daemon. Expose the web admin only to trusted admins.
       - /var/run/docker.sock:/var/run/docker.sock

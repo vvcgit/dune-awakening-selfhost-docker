@@ -8,6 +8,7 @@ The web admin has host and game-server control power. Treat it as an admin-only 
 - State-changing requests require a CSRF token from the authenticated session.
 - `AUTH_DISABLED=true` is allowed only for local development.
 - Login and logout are audit logged.
+- `ADMIN_SECURE_COOKIES=1` or `NODE_ENV=production` adds the `Secure` flag to session cookies. Leave it off only for plain-HTTP local development.
 
 ## Command Safety
 
@@ -20,6 +21,7 @@ All command execution must use the safe command runner:
 - enforce timeouts
 - redact secrets from stdout/stderr/task logs
 - write audit entries for high-risk operations
+- static frontend serving is constrained to the configured build directory
 
 Allowed command families are RedBlink `runtime/scripts/dune` operations and narrowly scoped Docker inspection/control where needed.
 
@@ -34,6 +36,7 @@ Direct Postgres features must:
 - require explicit confirmation for destructive SQL
 - support read-only mode
 - redact secrets and sensitive tokens from logs
+- reject JSON request bodies larger than `ADMIN_MAX_JSON_BYTES`
 
 Phase 5A direct DB admin mutations follow the same pattern: the API first verifies the backend confirmation phrase, creates a RedBlink DB backup with `dune db backup`, then runs a parameterized transaction. Supported write paths are Solaris/currency via `dune.adjust_player_virtual_currency_balance`, faction reputation via `dune.set_player_faction_reputation`, inventory delete via `dune.delete_item`, storage item insert into verified `dune.items`/`dune.inventories`, gear durability JSON repair, and owned vehicle fuel JSON update. If required tables/functions/columns are not detected, the endpoint returns a clear unsupported capability response instead of attempting a write.
 
@@ -109,3 +112,8 @@ Audit logging is required for:
 - SQL execution
 - file upload/download/restore
 - RabbitMQ live commands
+- Starter Kit config changes/manual grants/retries
+- map/Sietch/Deep Desert changes
+- blueprint/base export and blocked import/delete/clone attempts
+
+Audit retention/rotation is not implemented yet; `runtime/generated/web-admin-audit.jsonl` should be managed by the operator or a future retention task.

@@ -1,47 +1,39 @@
-# Arrakis Server Console
+# Web UI Guide
 
-Arrakis Server Console is the web admin interface for this Docker-native Dune: Awakening self-host repository.
+The Arrakis Server Console is organized by operational task.
 
-It does not replace the runtime scripts. The backend wraps `runtime/scripts/dune` through an allowlisted API so the existing CLI, Docker Compose stack, backups, updates, logs, and admin tools remain the source of truth.
+| Page | Purpose |
+|---|---|
+| Home | Server overview and quick start/stop/restart controls |
+| Setup | First-time setup and preflight checks |
+| Server Control | Lifecycle, readiness, ports, doctor, service restart |
+| Services | Container/service list with restart and log shortcuts |
+| Players | Player list, profile drawer, inventory/profile tabs, player actions |
+| Admin Tools | Catalogs, global live actions, broadcast, command history |
+| Live Map | Relative coordinate plot plus marker table |
+| Maps | Map mode, reconcile, spawn/despawn, autoscaler, memory, Sietches, Deep Desert |
+| Market | Read-only market items/listings/sales/stats/catalog where schema supports it |
+| Starter Kit | Disabled-by-default config, manual grants, grant history |
+| Database | Direct DB browser and SQL console with read-only safety |
+| Storage | Storage browser, item export, safe give-item where schema supports it |
+| Bases | Base list and read-only base-as-blueprint export |
+| Blueprints | Blueprint list and full read-only export |
+| Backups | Backup list/create/restore/delete |
+| Logs | Service log viewer, stream, download |
+| Updates | Game and stack update tasks |
+| Settings | Runtime setup state |
 
-## Run Locally
+## Error Handling
 
-Backend:
+Unsupported features show backend reasons. Dangerous actions require a browser confirmation and a backend phrase. Async actions return tasks and show task progress.
 
-```bash
-cd admin-server
-npm install
-DUNE_DOCKER_DIR=/home/ubuntu/dune-awakening-selfhost-docker npm run dev
-```
+## Blocked Features In The UI
 
-Frontend:
+Blocked features should remain disabled or return a clear unsupported response:
 
-```bash
-cd web
-npm install
-npm run dev
-```
+- Whisper
+- Market automation
+- Starter Kit automatic scanner
+- Blueprint/base import, clone, and delete
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://127.0.0.1:8088`.
-
-## Production Build
-
-```bash
-cd web
-npm install
-npm run build
-cd ../admin-server
-npm install
-npm start
-```
-
-The backend serves `web/dist` when present.
-
-## Container Mode
-
-```bash
-docker compose -f docker-compose.web.yml up -d --build
-```
-
-The container mounts this repo at `/repo` and mounts `/var/run/docker.sock` so the backend can run the existing Docker-backed scripts. Docker socket access is powerful; only expose this UI to trusted admins.
-
+Do not add buttons that claim success for those features until the backend has a verified RedBlink CLI, direct DB, or RabbitMQ path.

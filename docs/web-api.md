@@ -111,6 +111,7 @@ Base path for the native RedBlink API: `/api`.
 | `/api/deepdesert` | GET | Deep Desert status | `dune deepdesert dual status` |
 | `/api/deepdesert/update` | POST | Deep Desert dual control | Task wrapping validated `dune deepdesert dual enable|disable|repair|bootstrap`; requires `UPDATE DEEP DESERT` |
 | `/api/settings` | GET | Runtime settings state | Setup state/config summary |
+| `/api/settings` | POST | Save allowlisted runtime settings | Same allowlisted `.env` writer as setup config |
 | `/api/storage/:id` | GET | Storage detail | Direct PostgreSQL storage list lookup |
 | `/api/storage/:id/items` | GET | Storage inventory | Direct PostgreSQL inventory query |
 | `/api/storage/:id/give-item` | POST | Give item to storage | Creates `dune db backup`, validates item catalog/template and slot count, transactionally inserts into `dune.items`; requires `GIVE ITEM TO STORAGE` |

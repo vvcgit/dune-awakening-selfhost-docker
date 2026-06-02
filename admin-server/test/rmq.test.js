@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBroadcastCommand, buildShutdownBroadcastCommand, validateBroadcastMessage } from "../src/rmq.js";
+import { buildBroadcastCommand, buildShutdownBroadcastCommand, validateBroadcastMessage, validatePublishLabel } from "../src/rmq.js";
 
 test("builds verified ServiceBroadcast generic command payload", () => {
   const command = buildBroadcastCommand({ message: "Server event starts soon", durationSec: 45, title: "Event" });
@@ -27,4 +27,11 @@ test("builds shutdown ServiceBroadcast with strict shutdown type", () => {
   assert.equal(command.BroadcastPayload.ShutdownDuration, 15);
   assert.ok(command.BroadcastPayload.ShutdownTimestamp >= before);
   assert.throws(() => buildShutdownBroadcastCommand({ shutdownType: "RebootEverything" }));
+});
+
+test("validates RabbitMQ publish labels before eval construction", () => {
+  assert.equal(validatePublishLabel("web-broadcast"), "web-broadcast");
+  assert.equal(validatePublishLabel("web_shutdown_1"), "web_shutdown_1");
+  assert.throws(() => validatePublishLabel("bad label"));
+  assert.throws(() => validatePublishLabel("bad\"), halt(). %"));
 });
