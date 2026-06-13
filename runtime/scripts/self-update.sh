@@ -42,6 +42,32 @@ GITHUB_TOKEN="${DUNE_SELF_UPDATE_TOKEN:-}"
 LATEST_TAG_CACHE_FILE="runtime/generated/self-update-latest-tag.txt"
 API_LAST_STATUS=""
 
+detect_host_repo_root() {
+  local source
+
+  if [ -n "${DUNE_HOST_REPO_ROOT:-}" ]; then
+    printf '%s\n' "$DUNE_HOST_REPO_ROOT"
+    return 0
+  fi
+
+  if [ -f /.dockerenv ] && command -v docker >/dev/null 2>&1; then
+    source="$(
+      docker inspect redblink-dune-docker-console \
+        --format '{{range .Mounts}}{{if eq .Destination "/repo"}}{{.Source}}{{end}}{{end}}' \
+        2>/dev/null || true
+    )"
+    if [ -n "$source" ] && [ "$source" != "/repo" ]; then
+      printf '%s\n' "$source"
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "$ROOT_DIR"
+}
+
+HOST_ROOT_DIR="$(detect_host_repo_root)"
+export DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR"
+
 api_curl_common_args() {
   printf '%s\n' \
     -H "Accept: application/vnd.github+json" \
@@ -380,7 +406,7 @@ web_console_service_name() {
 
 rebuild_web_console_now() {
   local service="$1"
-  docker compose -f docker-compose.web.yml up -d --build --force-recreate "$service"
+  DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" docker compose -f docker-compose.web.yml up -d --build --force-recreate "$service"
 }
 
 rebuild_web_console_after_update() {
@@ -409,6 +435,32 @@ rebuild_web_console_after_update() {
   else
     rebuild_web_console_now "$service"
     echo "Dune Docker Console was rebuilt successfully."
+  fi
+}
+
+install_cli_command_after_update() {
+  if [ ! -x runtime/scripts/install-command.sh ]; then
+    return 0
+  fi
+
+  if [ -f /.dockerenv ]; then
+    echo
+    echo "The dune CLI command install was skipped because the update is running inside the web console container."
+    echo "If the host does not have the dune command yet, run this once from the server folder:"
+    echo "  sudo ./runtime/scripts/install-command.sh"
+    return 0
+  fi
+
+  echo
+  echo "Installing dune CLI command..."
+  if [ "$(id -u)" -eq 0 ]; then
+    runtime/scripts/install-command.sh || true
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo runtime/scripts/install-command.sh || true
+  else
+    echo "Could not install the dune command automatically because sudo is not available."
+    echo "Run this once as root if you want the CLI command:"
+    echo "  runtime/scripts/install-command.sh"
   fi
 }
 
@@ -568,6 +620,7 @@ case "$cmd" in
 
     cache_latest_release_tag "$tag"
     install_release_tag "$tag"
+    install_cli_command_after_update
     rebuild_web_console_after_update
     ;;
 

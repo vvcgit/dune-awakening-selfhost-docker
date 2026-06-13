@@ -3277,6 +3277,7 @@ function StackUpdateProgress({ task, onRetry }: { task: Task; onRetry: () => Pro
       <strong>{progress.percent}%</strong>
     </div>
     <p>{formatResultMessage(progress.message)}</p>
+    {task.status === "succeeded" && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Console</button></div>}
     {task.status === "failed" && <div className="action-line"><button onClick={onRetry}>Retry Console Update</button></div>}
   </div>;
 }
@@ -3286,7 +3287,7 @@ function summarizeStackUpdateProgress(task: Task) {
   const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
   if (task.status === "succeeded") {
     const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
-    return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Dune Docker Console is rebuilding and may ask you to refresh and sign in again.` : "Console files were updated. Dune Docker Console is rebuilding and may ask you to refresh and sign in again." };
+    return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Refresh this page to load the new Web UI. You may need to sign in again.` : "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again." };
   }
   if (task.status === "failed") {
     return { title: "Console Update Failed", percent: Math.max(5, stackUpdatePercent(text)), message: conciseTaskError(task) };
@@ -6649,6 +6650,7 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
   }, [gameUpdateTask?.id, gameUpdateTask?.status]);
   useEffect(() => {
     if (!stackUpdateTask || !isTerminalTask(stackUpdateTask.status)) return;
+    if (stackUpdateTask.status === "succeeded") return;
     const id = window.setTimeout(() => setStackUpdateTask(null), UPDATE_RESULT_DISMISS_MS);
     return () => window.clearTimeout(id);
   }, [stackUpdateTask?.id, stackUpdateTask?.status]);
