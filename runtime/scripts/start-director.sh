@@ -56,6 +56,11 @@ mkdir -p runtime/director/config
 mkdir -p runtime/generated/director-bundle
 mkdir -p "$FAKE_K8S_SERVICEACCOUNT_DIR"
 
+if [ -d runtime/director/config/director_config.ini ]; then
+  echo "Repairing generated director config path..."
+  rm -rf runtime/director/config/director_config.ini
+fi
+
 cat > runtime/director/config/director_config.ini <<'EOF'
 [Battlegroup]
 AuthorizationPreset=BattlegroupInternal
@@ -240,6 +245,11 @@ EOF
 
 chmod -R 755 "$FAKE_K8S_SERVICEACCOUNT_DIR"
 chmod -R 755 runtime/director/config
+
+if [ ! -f runtime/director/config/director_config.ini ]; then
+  echo "Failed to prepare director config file: runtime/director/config/director_config.ini"
+  exit 1
+fi
 
 docker network create dune-net 2>/dev/null || true
 docker rm -f dune-director 2>/dev/null || true
