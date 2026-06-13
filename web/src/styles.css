@@ -641,6 +641,10 @@ main { padding: 22px; min-width: 0; }
   55% { opacity: .42; }
   to { transform: translate3d(30vw, 5vh, 0) skewX(-7deg); opacity: .72; }
 }
+@keyframes setupCelebrate {
+  0%, 100% { transform: translateY(8px) rotate(0deg); opacity: .55; }
+  45% { transform: translateY(-8px) rotate(8deg); opacity: 1; }
+}
 .care-package-result { margin-top: 12px; animation: backupResultFadeOut .4s ease 5s forwards; }
 .key-value-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .key-value-item { display: grid; gap: 5px; }
@@ -713,6 +717,24 @@ body.debug .technical-details { display: block; }
 .deployment-progress span { color: #d9c8aa; font-size: 13px; }
 .task-elapsed { margin-top: 8px; color: #d9c8aa; }
 .task-elapsed strong, .setup-success-countdown strong { color: #fff1d4; }
+.setup-finish-celebration {
+  display: flex;
+  gap: 10px;
+  min-height: 34px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.setup-finish-celebration span {
+  width: 8px;
+  height: 18px;
+  border-radius: 3px;
+  background: #ffd08a;
+  animation: setupCelebrate 1.2s ease-in-out infinite;
+}
+.setup-finish-celebration span:nth-child(2) { background: #9be6bd; animation-delay: .12s; }
+.setup-finish-celebration span:nth-child(3) { background: #b6d5ff; animation-delay: .24s; }
+.setup-finish-celebration span:nth-child(4) { background: #d9a7e2; animation-delay: .36s; }
+.setup-finish-celebration span:nth-child(5) { background: #fff1d4; animation-delay: .48s; }
 .danger-note, .error, .error-banner { color: var(--danger-text); }
 .success-note { color: #9be6bd; }
 .error-banner { background: #351b1b; border: 1px solid var(--danger-strong); padding: 12px; border-radius: 6px; margin-bottom: 14px; }
@@ -932,7 +954,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-sand-fine, .home-sand-near { animation: none; }
+  .home-sand-fine, .home-sand-near, .setup-finish-celebration span { animation: none; }
 }
 
 .toggle-row { display: flex; flex-wrap: wrap; gap: 8px; }

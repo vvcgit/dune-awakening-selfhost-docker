@@ -438,6 +438,7 @@ export function App() {
           <SetupWizard
             initialStep={setupJump.step}
             jumpNonce={setupJump.nonce}
+            mode="first-run"
             onSetupComplete={async () => {
               const state = await setupApi.state();
               setSetupState(state);
@@ -495,7 +496,7 @@ export function App() {
         </header>
         {error && <div className="error-banner">{error}</div>}
         {tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} />}
-        {tab === "Setup" && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} onSetupComplete={async () => setSetupState(await setupApi.state())} />}
+        {tab === "Setup" && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
         {tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} setRunningAction={setHomeRunningAction} onError={setError} onRedeploy={() => {
           setSetupJump((current) => ({ step: 4, nonce: current.nonce + 1 }));
           setTab("Setup");

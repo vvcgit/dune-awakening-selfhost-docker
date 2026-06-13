@@ -10,7 +10,7 @@ type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: str
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
 const completionRedirectSeconds = 5;
 
-export function SetupWizard({ initialStep = 0, jumpNonce = 0, onSetupComplete }: { initialStep?: number; jumpNonce?: number; onSetupComplete?: () => void }) {
+export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy", onSetupComplete }: { initialStep?: number; jumpNonce?: number; mode?: "first-run" | "redeploy"; onSetupComplete?: () => void }) {
   const [step, setStep] = useState(initialStep);
   const [maxUnlockedStep, setMaxUnlockedStep] = useState(initialStep);
   const [checks, setChecks] = useState<Check[]>([]);
@@ -54,12 +54,12 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, onSetupComplete }:
   }, []);
 
   useEffect(() => {
-    if (task?.operation !== "init" || task.status !== "succeeded") {
+    if (task?.operation !== "init" || task.status !== "succeeded" || mode !== "first-run") {
       setRedirectCountdown(null);
       return;
     }
     setRedirectCountdown(completionRedirectSeconds);
-  }, [task?.id, task?.operation, task?.status]);
+  }, [mode, task?.id, task?.operation, task?.status]);
 
   useEffect(() => {
     if (redirectCountdown === null) return;
@@ -95,6 +95,10 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, onSetupComplete }:
       await new Promise((resolve) => window.setTimeout(resolve, 2500));
       current = (await setupApi.task(current.id)).task;
       setTask(current);
+    }
+    if (current.status === "succeeded") {
+      setMaxUnlockedStep((value) => Math.max(value, 9));
+      setStep(9);
     }
   }
 
@@ -251,11 +255,14 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, onSetupComplete }:
           <p>This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates.</p>
           <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>{deploymentSucceeded ? "Deployment Complete" : deploymentRunning ? "Deploying..." : "Start Deployment"}</button>
           <TaskProgress task={task} />
-          {deploymentSucceeded && <p className="success-note setup-success-countdown">Deployment was successful. The console will open the full dashboard in <strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
+          {deploymentSucceeded && <p className="success-note">Deployment was successful. Opening the finish step.</p>}
         </>}
         {step === 9 && <>
-          <h2>Finish</h2>
-          <p>The server stack has started. Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server. Open the dashboard to watch readiness, review logs, and create your first backup.</p>
+          <div className="setup-finish-celebration" aria-hidden="true"><span /><span /><span /><span /><span /></div>
+          <h2>Congratulations</h2>
+          <p>{mode === "first-run" ? "The server was installed successfully. The full console is ready to open." : "Setup completed successfully. The server has been redeployed and the full console is still available."}</p>
+          {mode === "first-run" && <p className="success-note setup-success-countdown">Opening the full console in <strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
+          <p className="muted">Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.</p>
         </>}
         <div className="wizard-controls">
           <button disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
