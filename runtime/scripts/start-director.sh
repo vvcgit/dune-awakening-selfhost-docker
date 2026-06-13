@@ -331,4 +331,9 @@ docker ps --filter "name=dune-director" --format "table {{.Names}}\t{{.Status}}\
 
 echo
 echo "=== director logs ==="
-docker logs --tail 160 dune-director
+if ! docker logs --tail 160 dune-director; then
+  echo "Director logs are not available from Docker."
+  echo
+  echo "=== director container state ==="
+  docker inspect dune-director --format 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} RestartCount={{.RestartCount}} Started={{.State.StartedAt}} Finished={{.State.FinishedAt}} Error={{.State.Error}}' 2>/dev/null || true
+fi
