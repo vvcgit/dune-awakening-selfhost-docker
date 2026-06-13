@@ -107,7 +107,7 @@ start_docker() {
     step "Giving your user access to Docker."
     need_sudo usermod -aG docker "$USER" || true
     if select_docker_command; then
-      echo "Your user was added to the docker group. The installer will continue with administrator Docker access for this first launch."
+      echo "Docker is ready. Setup can continue."
       return
     fi
   fi
@@ -233,7 +233,7 @@ show_finish() {
   echo "If you are connecting over the internet, use the public address and make sure TCP $WEB_PORT is allowed by the server firewall or VPS firewall."
   if [ "$DOCKER_GROUP_UPDATED" = "1" ]; then
     echo
-    echo "Your user was added to the docker group. After you sign out and back in, Docker commands will work without sudo."
+    echo "Docker is ready. Setup can continue."
   fi
   echo
   echo "Your first admin password was generated automatically."
