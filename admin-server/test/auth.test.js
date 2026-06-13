@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAuth, clearSessionCookie, setSessionCookie } from "../src/auth.js";
+import { createAuth, clearSessionCookie, setSessionCookie, json } from "../src/auth.js";
 
 test("auth creates readable signed sessions", () => {
   const auth = createAuth({ sessionSecret: "secret", adminPassword: "admin", authDisabled: false });
@@ -39,6 +39,15 @@ test("session cookies can opt into Secure for production/container deployments",
   clearSessionCookie(res, { secureCookies: true });
   assert.match(res.headers["Set-Cookie"], /Max-Age=0/);
   assert.match(res.headers["Set-Cookie"], /Secure/);
+});
+
+test("json responses include defensive browser headers", () => {
+  const res = fakeResponse();
+  json(res, 200, { ok: true });
+  assert.equal(res.headers["x-content-type-options"], "nosniff");
+  assert.equal(res.headers["x-frame-options"], "DENY");
+  assert.equal(res.headers["referrer-policy"], "no-referrer");
+  assert.match(res.headers["permissions-policy"], /camera=\(\)/);
 });
 
 function fakeResponse() {

@@ -2,6 +2,17 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const sessions = new Map();
 
+export const SECURITY_HEADERS = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "permissions-policy": "geolocation=(), microphone=(), camera=()"
+};
+
+export function withSecurityHeaders(headers = {}) {
+  return { ...SECURITY_HEADERS, ...headers };
+}
+
 export function parseCookies(header = "") {
   const cookies = new Map();
   for (const part of header.split(";")) {
@@ -75,6 +86,6 @@ export function clearSessionCookie(res, config = {}) {
 }
 
 export function json(res, status, body, headers = {}) {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", ...headers });
+  res.writeHead(status, withSecurityHeaders({ "content-type": "application/json; charset=utf-8", ...headers }));
   res.end(JSON.stringify(body));
 }

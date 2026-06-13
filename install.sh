@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-APP_NAME="RedBlink Dune Docker Console"
+APP_NAME="Dune Docker Console"
 WEB_COMPOSE="docker-compose.web.yml"
 WEB_SERVICE="redblink-dune-docker-console"
 WEB_PORT="${ADMIN_BIND_PORT:-8088}"

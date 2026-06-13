@@ -4,7 +4,8 @@ import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, read
 import { basename, extname, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { loadConfig, publicConfig } from "./config.js";
-import { createAuth, setSessionCookie, clearSessionCookie, json } from "./auth.js";
+import { createAuth, setSessionCookie, clearSessionCookie, json, withSecurityHeaders } from "./auth.js";
+import { createLoginRateLimiter } from "./rateLimit.js";
 import { TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
@@ -20,6 +21,7 @@ import { parseBackupAutoStatus, parseBackupListRows, parseMemoryStatusRows } fro
 
 const config = loadConfig();
 const auth = createAuth(config);
+const loginRateLimiter = createLoginRateLimiter();
 const tasks = new TaskManager(config);
 let db = createDb(config);
 let carePackageAutoRunning = false;
@@ -195,8 +197,17 @@ async function handleApi(req, res) {
     return json(res, 200, { authenticated: Boolean(session), csrfToken: session?.csrf || null, config: publicConfig(config) });
   }
   if (path === "/api/auth/login" && req.method === "POST") {
+    const rateKey = loginRateLimitKey(req);
+    const rate = loginRateLimiter.check(rateKey);
+    if (!rate.allowed) {
+      return json(res, 429, { error: "Too many sign-in attempts. Please wait a few minutes, then try again." }, { "retry-after": String(rate.retryAfterSeconds) });
+    }
     const body = await readJson(req);
-    if (!config.authDisabled && !auth.passwordMatches(body.password)) return json(res, 401, { error: "Incorrect password. Please try again!" });
+    if (!config.authDisabled && !auth.passwordMatches(body.password)) {
+      loginRateLimiter.recordFailure(rateKey);
+      return json(res, 401, { error: "Incorrect password. Please try again!" });
+    }
+    loginRateLimiter.recordSuccess(rateKey);
     const session = auth.makeSession();
     setSessionCookie(res, session, config);
     audit(config, req, "auth.login");
@@ -1974,6 +1985,10 @@ function serveStatic(req, res) {
     json(res, 200, { app: config.appName, message: "Frontend is not built yet. Run npm install && npm run build in web/." });
     return;
   }
-  res.writeHead(200, { "content-type": mime.get(extname(target)) || "application/octet-stream" });
+  res.writeHead(200, withSecurityHeaders({ "content-type": mime.get(extname(target)) || "application/octet-stream" }));
   createReadStream(target).pipe(res);
+}
+
+function loginRateLimitKey(req) {
+  return req.socket?.remoteAddress || "unknown";
 }
