@@ -183,7 +183,7 @@ show_finish() {
   echo "After signing in, the setup wizard will check the server and finish everything from the browser."
 }
 
-say "Starting $APP_NAME installer."
+say "Starting Dune Docker Console Installer."
 
 if ! is_linux; then
   echo "This automatic installer runs on Linux servers."
