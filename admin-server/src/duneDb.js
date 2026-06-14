@@ -917,6 +917,7 @@ export async function playerCurrency(db, id) {
 export async function playerFactions(db, id) {
   if (!(await tableExists(db, "player_faction_reputation"))) return unsupported("factions", ["dune.player_faction_reputation"]);
   const hasFactions = await tableExists(db, "factions");
+  const player = await resolvePlayerMutationTarget(db, id);
   const result = await db.query(`
     select pfr.actor_id,
            pfr.faction_id,
@@ -925,8 +926,8 @@ export async function playerFactions(db, id) {
     from dune.player_faction_reputation pfr
     ${hasFactions ? "left join dune.factions f on f.id = pfr.faction_id" : ""}
     where pfr.actor_id = $1
-    order by pfr.faction_id`, [intParam(id, "player id", 1)]);
-  return { capabilities: { factions: true, factionNames: hasFactions }, rows: result.rows };
+    order by pfr.faction_id`, [player.controllerId]);
+  return { capabilities: { factions: true, factionNames: hasFactions }, player, rows: result.rows };
 }
 
 export async function playerSpecs(db, id) {
@@ -1465,15 +1466,16 @@ export async function addFactionReputation(db, id, { factionId, amount }) {
     const current = await tx.query(`
       select reputation_amount
       from dune.player_faction_reputation
-      where actor_id = $1 and faction_id = $2`, [player.actorId, faction]);
+      where actor_id = $1 and faction_id = $2`, [player.controllerId, faction]);
     const oldValue = Number(current.rows[0]?.reputation_amount || 0);
     const nextValue = Math.max(0, Math.min(12474, oldValue + delta));
-    await tx.query("select dune.set_player_faction_reputation($1::bigint, $2::smallint, $3::integer)", [player.actorId, faction, nextValue]);
-    if (faction === 1 || faction === 2) await syncFactionComponent(tx, player.actorId);
+    await tx.query("select dune.set_player_faction_reputation($1::bigint, $2::smallint, $3::integer)", [player.controllerId, faction, nextValue]);
+    if (faction === 1 || faction === 2) await syncFactionComponent(tx, player.controllerId);
     return {
       ok: true,
       player,
       factionId: faction,
+      actorId: player.controllerId,
       oldValue,
       newValue: nextValue,
       message: playerOnline(player)
