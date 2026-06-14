@@ -3127,10 +3127,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 
 function parseUpdateTask(task: Task) {
   const text = task.logLines.map((line) => line.line).join("\n");
-  if (task.status === "failed") return { status: "Check Failed", current: "", latest: "", reason: task.errorMessage || summarizeCommandText(text) };
-  if (task.status !== "succeeded") return { status: "Checking...", current: "", latest: "", reason: task.progressMessage || "" };
   const current = firstVersionMatch(text, [/current(?: stack)?(?: build| version)?\s*[:=]\s*([^\n]+)/i, /installed(?: build| version)?\s*[:=]\s*([^\n]+)/i, /local(?: build| version)?\s*[:=]\s*([^\n]+)/i]);
   const latest = firstVersionMatch(text, [/latest(?: release| build| version)?\s*[:=]\s*([^\n]+)/i, /remote(?: build| version)?\s*[:=]\s*([^\n]+)/i, /available(?: build| version)?\s*[:=]\s*([^\n]+)/i]);
+  if (task.status === "failed") return { status: "Check Failed", current, latest, reason: task.errorMessage || summarizeCommandText(text) };
+  if (task.status !== "succeeded") return { status: "Checking...", current, latest, reason: task.progressMessage || "" };
   const updateAvailable = /update available|newer|can update|available update/i.test(text);
   const latestStatus = /up to date|already latest|no update|latest/i.test(text) && !updateAvailable;
   if (sameUpdateVersion(current, latest)) return { status: "Latest", current, latest, reason: summarizeCommandText(text) };
@@ -3509,7 +3509,11 @@ function isValidHourMinuteTime(value: string) {
 function firstVersionMatch(text: string, patterns: RegExp[]) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match) return match[1].trim().slice(0, 80);
+    if (match) {
+      const value = match[1].trim().slice(0, 80);
+      if (/^(unknown|unavailable|n\/a|none)$/i.test(value)) continue;
+      return value;
+    }
   }
   return "";
 }

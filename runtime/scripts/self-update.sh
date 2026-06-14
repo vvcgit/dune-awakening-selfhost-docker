@@ -556,12 +556,16 @@ tag="${2:-}"
 
 case "$cmd" in
   check|status)
+    echo "Current stack version: $CURRENT_VERSION"
     set +e
     latest="$(latest_release_tag)"
     rc=$?
     set -e
 
     if [ "$rc" -ne 0 ] || [ -z "${latest:-}" ]; then
+      echo "Latest release:        unknown"
+      echo "GitHub repo:           $GITHUB_REPO"
+      echo
       print_release_fetch_failure "check stack releases"
       exit 2
     fi
