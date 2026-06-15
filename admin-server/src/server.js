@@ -18,6 +18,7 @@ import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishServerComm
 import { clearCarePackageHistory, enableCarePackage, grantEligibleCarePackages, grantCarePackage, retryCarePackageGrant, runCarePackageAutoScan, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory } from "./carePackage.js";
 import { readJsonBody, safeStaticTarget } from "./httpSafety.js";
 import { parseBackupAutoStatus, parseBackupListRows, parseMemoryStatusRows } from "./statusParsers.js";
+import { fetchCommunityAddons, installCommunityAddon, installedAddonContentPath, listInstalledAddons, removeInstalledAddon, setInstalledAddonEnabled } from "./addons.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -318,6 +319,34 @@ async function handleApi(req, res) {
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
   if (path === "/api/admin/whisper" && req.method === "POST") return whisperRoute(req, res);
+  if (path === "/api/addons/community") return json(res, 200, await fetchCommunityAddons());
+  if (path === "/api/addons/installed") return json(res, 200, listInstalledAddons(config));
+  if (path === "/api/addons/leadership/players") return dbJson(res, () => duneDb.addonLeadershipPlayers(db));
+  if (path === "/api/addons/community/install" && req.method === "POST") {
+    const body = await readJson(req);
+    const result = await installCommunityAddon(config, body.id);
+    audit(config, req, "addons.install", { id: result.addon.id, version: result.addon.version, ok: true });
+    return json(res, 200, result);
+  }
+  if (path.match(/^\/api\/addons\/installed\/[^/]+\/enable$/) && req.method === "POST") {
+    const id = decodeURIComponent(path.split("/").at(-2));
+    const result = setInstalledAddonEnabled(config, id, true);
+    audit(config, req, "addons.enable", { id: result.addon.id, version: result.addon.version, ok: true });
+    return json(res, 200, result);
+  }
+  if (path.match(/^\/api\/addons\/installed\/[^/]+\/disable$/) && req.method === "POST") {
+    const id = decodeURIComponent(path.split("/").at(-2));
+    const result = setInstalledAddonEnabled(config, id, false);
+    audit(config, req, "addons.disable", { id: result.addon.id, version: result.addon.version, ok: true });
+    return json(res, 200, result);
+  }
+  if (path.match(/^\/api\/addons\/installed\/[^/]+\/content\/.+$/) && req.method === "GET") return addonContentRoute(req, res, path);
+  if (path.match(/^\/api\/addons\/installed\/[^/]+$/) && req.method === "DELETE") {
+    const id = decodeURIComponent(path.split("/").pop());
+    const result = removeInstalledAddon(config, id);
+    audit(config, req, "addons.remove", { id, ok: true });
+    return json(res, 200, result);
+  }
   if (path.match(/^\/api\/players\/[^/]+\/give-item$/) && req.method === "POST") return giveSingleItemRoute(req, res, path, "adminGiveItem");
   if (path.match(/^\/api\/players\/[^/]+\/give-items$/) && req.method === "POST") return giveItemsRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/give-item-id$/) && req.method === "POST") return giveSingleItemRoute(req, res, path, "adminGiveItemId");
@@ -426,6 +455,19 @@ async function handleApi(req, res) {
   if (path === "/api/settings") return json(res, 200, await setupState());
 
   return json(res, 404, { error: "Not found" });
+}
+
+function addonContentRoute(req, res, path) {
+  const parts = path.split("/");
+  const id = decodeURIComponent(parts[4] || "");
+  const contentPath = decodeURIComponent(parts.slice(6).join("/"));
+  const target = installedAddonContentPath(config, id, contentPath);
+  if (!existsSync(target)) return json(res, 404, { error: "Addon content file not found." });
+  res.writeHead(200, withSecurityHeaders({
+    "content-type": mime.get(extname(target)) || "application/octet-stream",
+    "x-frame-options": "SAMEORIGIN"
+  }));
+  createReadStream(target).pipe(res);
 }
 
 let previousCpuSample = null;

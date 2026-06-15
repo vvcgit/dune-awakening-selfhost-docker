@@ -3,6 +3,7 @@
 runtime/secrets/
 runtime/generated/
 runtime/backups/
+runtime/addons/
 *.bak-before-*
 
 # Runtime state / generated service configs

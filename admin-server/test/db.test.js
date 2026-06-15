@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -236,6 +236,74 @@ test("players query uses parameterized search input", async () => {
   assert.equal(result.rows[0].funcom_id, "RedBlink#75570");
   assert.equal(result.rows[0].fls_id, "RedBlink#75570");
   assert.equal(result.rows[0].action_player_id, "RedBlink#75570");
+});
+
+test("addon leadership players include level and faction summaries", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.actors", "dune.player_state", "dune.specialization_tracks", "dune.player_faction", "dune.factions"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      if (text.includes("from dune.actors a")) {
+        return { rows: [
+          { actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, map: "Survival_1", online_status: "Online", last_seen: "" },
+          { actor_id: 102, player_pawn_id: 102, account_id: 202, character_name: "Test Two", player_controller_id: 302, map: "Overmap", online_status: "Offline", last_seen: "2026-06-14T01:02:03Z" }
+        ] };
+      }
+      if (text.includes("from dune.specialization_tracks")) {
+        return { rows: [
+          { player_id: "301", level: 18 },
+          { player_id: "302", level: 7 }
+        ] };
+      }
+      if (text.includes("from dune.player_faction pf")) {
+        return { rows: [
+          { actor_id: "301", faction_id: "1", faction_name: "Atreides" },
+          { actor_id: "302", faction_id: "2", faction_name: "Harkonnen" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await addonLeadershipPlayers(db);
+  assert.equal(result.rows.length, 2);
+  assert.deepEqual(result.rows.map((row) => [row.name, row.level, row.faction]), [
+    ["Test One", 18, "Atreides"],
+    ["Test Two", 7, "Harkonnen"]
+  ]);
+  assert.equal(result.rows[0].guild, "Unavailable");
+});
+
+test("addon leadership players derive character level from level component XP", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.actors", "dune.player_state", "dune.actor_fgl_entities", "dune.fgl_entities"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      if (text.includes("from dune.actors a")) {
+        return { rows: [
+          { actor_id: 475, player_pawn_id: 475, account_id: 201, character_name: "Kerplunk Kersplat", player_controller_id: 473, map: "Survival_1", online_status: "Online", last_seen: "" },
+          { actor_id: 746, player_pawn_id: 746, account_id: 202, character_name: "Test9", player_controller_id: 744, map: "Overmap", online_status: "Offline", last_seen: "" }
+        ] };
+      }
+      if (text.includes("from dune.player_state ps") && text.includes("FLevelComponent")) {
+        return { rows: [
+          { player_controller_id: "473", player_pawn_id: "475", xp: 42044 },
+          { player_controller_id: "744", player_pawn_id: "746", xp: 0 }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await addonLeadershipPlayers(db);
+  assert.deepEqual(result.rows.map((row) => [row.name, row.level]), [
+    ["Kerplunk Kersplat", 73],
+    ["Test9", 0]
+  ]);
 });
 
 test("live map player markers validate map filter and use parameterized transform query", async () => {

@@ -19,6 +19,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         bash \
+        unzip \
         procps \
         netcat-openbsd \
     && rm -rf /var/lib/apt/lists/* \

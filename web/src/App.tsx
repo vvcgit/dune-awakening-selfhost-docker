@@ -12,6 +12,7 @@ import { mapsApi, type LiveMapMemoryRow, type SwapMemoryState, type UserSettingF
 import { updatesApi } from "./api/updates";
 import { worldDataApi } from "./api/worldData";
 import { adminApi } from "./api/admin";
+import { addonsApi } from "./api/addons";
 import { carePackageApi, type CarePackageConfig, type CarePackageEntry } from "./api/carePackage";
 import type { CarePackageAutoGrantRule } from "./api/carePackage";
 import { setupApi, type Task } from "./api/setup";
@@ -22,6 +23,7 @@ import { LogViewer } from "./components/LogViewer";
 import { PortChecklist } from "./components/PortChecklist";
 import { ReadinessTimeline } from "./components/ReadinessTimeline";
 import { SecretInput } from "./components/SecretInput";
+import { AddonsPanel, loadPinnedAddons, savePinnedAddons, type PinnedAddon } from "./features/addons/AddonsPanel";
 
 type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
@@ -277,6 +279,9 @@ export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
   const [tab, setTab] = useState<Tab>("Home");
+  const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
+  const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
+  const [addonCount, setAddonCount] = useState(0);
   const [status, setStatus] = useState("");
   const [readiness, setReadiness] = useState("");
   const [ports, setPorts] = useState("");
@@ -305,6 +310,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    savePinnedAddons(pinnedAddons);
+  }, [pinnedAddons]);
+
+  useEffect(() => {
     api<{ authenticated: boolean; csrfToken: string | null }>("/api/auth/state").then((state) => {
       setAuth(state.authenticated);
       setCsrfToken(state.csrfToken);
@@ -319,6 +328,7 @@ export function App() {
     if (!auth) {
       setSetupState(null);
       setSetupStateLoaded(false);
+      setAddonCount(0);
       return;
     }
     let cancelled = false;
@@ -334,6 +344,19 @@ export function App() {
       setSetupStateLoaded(true);
       setTab("Setup");
     });
+    return () => { cancelled = true; };
+  }, [auth]);
+
+  useEffect(() => {
+    if (!auth) return;
+    let cancelled = false;
+    addonsApi.community()
+      .then((result) => {
+        if (!cancelled) setAddonCount((result.addons || []).length);
+      })
+      .catch(() => {
+        if (!cancelled) setAddonCount(0);
+      });
     return () => { cancelled = true; };
   }, [auth]);
 
@@ -515,10 +538,21 @@ export function App() {
             <section className="sidebar-nav-group" key={group.title} aria-label={group.title}>
               <p className="sidebar-nav-heading">{group.title}</p>
               {group.items.map((item) => (
-                <button key={item.tab} className={tab === item.tab ? "active" : ""} onClick={() => {
-                  if (item.tab === "Setup") setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
-                  setTab(item.tab);
-                }}>{item.icon}{item.tab}</button>
+                <Fragment key={item.tab}>
+                  <button className={tab === item.tab && (!selectedPinnedAddonId || item.tab !== "Addons") ? "active" : ""} onClick={() => {
+                    if (item.tab === "Setup") setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
+                    setSelectedPinnedAddonId("");
+                    setTab(item.tab);
+                  }}>{item.icon}<span>{item.tab}</span>{item.tab === "Addons" && addonCount > 0 && <span className="sidebar-nav-count">{addonCount}</span>}</button>
+                  {item.tab === "Addons" && pinnedAddons.length > 0 && <div className="sidebar-addon-children">
+                    {pinnedAddons.map((addon) => (
+                      <button key={addon.id} className={tab === "Addons" && selectedPinnedAddonId === addon.id ? "active" : ""} onClick={() => {
+                        setSelectedPinnedAddonId(addon.id);
+                        setTab("Addons");
+                      }}>{addon.name}</button>
+                    ))}
+                  </div>}
+                </Fragment>
               ))}
               {group.title === "Community" && (
                 <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><MessageCircle size={18} />Requests</a>
@@ -557,7 +591,7 @@ export function App() {
         {tab === "Live Map" && <LiveMapPanel onError={setError} />}
         {tab === "Maps" && <MapsPanel setTask={setTask} onError={setError} />}
         {tab === "Care Package" && <CarePackagePanel onError={setError} />}
-        {tab === "Addons" && <AddonsPanel />}
+        {tab === "Addons" && <AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonCount={setAddonCount} confirmAction={confirmDialog} />}
         {tab === "Database" && <DatabasePanel />}
         {tab === "Storage" && <StoragePanel onError={setError} />}
         {tab === "Backups" && <BackupsPanel backupRestoreTask={backupRestoreTask} setBackupRestoreTask={setBackupRestoreTask} onError={setError} />}
@@ -4445,16 +4479,6 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
   }
 }
 
-function AddonsPanel() {
-  return <section className="panel">
-    <div className="panel-title"><h2>Addons</h2></div>
-    <section className="action-section info-panel">
-      <h4>Something is stirring beneath the sand.</h4>
-      <p>The next layer of Arrakis is not ready to reveal itself yet. Future updates will unlock new ways to extend, shape, and command your server.</p>
-    </section>
-  </section>;
-}
-
 function normalizeCarePackageConfig(config: CarePackageConfig): CarePackageConfig {
   const fallbackKit: CarePackageEntry = { id: config.version || "care-package-v1", name: "Care Package", items: config.items || [], xp: Number(config.xp) || 0, sendMessage: "" };
   const kits = (Array.isArray(config.kits) ? config.kits : [fallbackKit]).map((kit, index) => ({
@@ -7623,10 +7647,10 @@ function OutputPanel({ title, text, action, onAction }: { title: string; text: s
   return <section className="panel"><h2>{title}</h2><button onClick={onAction}>{action}</button><TechnicalDetails text={text} /></section>;
 }
 
-function DataTable({ rows, columns, onRowClick, action, actionClassName = "", tableClassName = "", renderCell, emptyMessage = "No rows." }: { rows: Record<string, unknown>[]; columns?: string[]; onRowClick?: (row: Record<string, unknown>) => void; action?: (row: Record<string, unknown>) => React.ReactNode; actionClassName?: string; tableClassName?: string; renderCell?: (row: Record<string, unknown>, column: string) => React.ReactNode; emptyMessage?: string }) {
+function DataTable({ rows, columns, onRowClick, action, actionClassName = "", secondaryAction, secondaryActionLabel = "Action", secondaryActionClassName = "", tableClassName = "", renderCell, emptyMessage = "No rows." }: { rows: Record<string, unknown>[]; columns?: string[]; onRowClick?: (row: Record<string, unknown>) => void; action?: (row: Record<string, unknown>) => React.ReactNode; actionClassName?: string; secondaryAction?: (row: Record<string, unknown>) => React.ReactNode; secondaryActionLabel?: string; secondaryActionClassName?: string; tableClassName?: string; renderCell?: (row: Record<string, unknown>, column: string) => React.ReactNode; emptyMessage?: string }) {
   const cols = columns?.length ? columns : Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8);
   if (!rows.length) return <div className="empty">{emptyMessage}</div>;
-  return <div className="table-wrap"><table className={tableClassName}><thead><tr>{cols.map((col) => <th key={col}>{friendlyColumnName(col)}</th>)}{action && <th className={actionClassName}>Actions</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{cols.map((col) => <td key={col}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}</tr>)}</tbody></table></div>;
+  return <div className="table-wrap"><table className={tableClassName}><thead><tr>{cols.map((col) => <th key={col}>{friendlyColumnName(col)}</th>)}{action && <th className={actionClassName}>Actions</th>}{secondaryAction && <th className={secondaryActionClassName}>{secondaryActionLabel}</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{cols.map((col) => <td key={col}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}{secondaryAction && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}</tr>)}</tbody></table></div>;
 }
 
 function formatCell(value: unknown) {

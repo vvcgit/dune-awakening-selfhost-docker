@@ -244,6 +244,15 @@ h1, h2, h3, h4, h5 { color: var(--title); line-height: 1.2; letter-spacing: 0; }
   border-radius: 8px;
   padding: 10px 12px;
 }
+.sidebar-nav-count { margin-left: auto; min-width: 24px; padding: 2px 7px; border: 1px solid #4d4032; border-radius: 999px; background: #171a1d; color: #ffd08a; font-size: 12px; font-weight: 800; text-align: center; }
+.sidebar-addon-children { display: grid; gap: 6px; padding-left: 16px; }
+.sidebar-addon-children button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #d9c8aa;
+  background: rgba(13, 15, 17, .48);
+}
 main { padding: 22px; min-width: 0; }
 .home-main {
   position: relative;
@@ -468,6 +477,29 @@ main { padding: 22px; min-width: 0; }
 .action-line label.wide-field { flex: 1 1 420px; }
 .action-line label.checkbox-line { flex: 0 0 280px; }
 .action-line button, .action-section > button { width: auto; justify-self: start; }
+.addons-title-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.addons-title-status { color: #8fffd2; font-size: .72em; font-weight: 700; }
+.addons-owner-copy { display: grid; gap: 6px; min-width: 0; }
+.addon-result-panel { margin-top: 12px; animation: addonNoticeFade 5s ease forwards; }
+.addons-table th:nth-child(5), .addons-table td:nth-child(5) { text-align: center; }
+.addon-status-cell { display: flex; justify-content: center; }
+.addon-status-toggle { min-width: 124px; }
+.addon-pin-column { text-align: center; }
+.addon-pin-toggle { min-width: 0; min-height: 0; justify-content: center; border-color: transparent; background: transparent; padding: 0; color: inherit; }
+.addon-pin-toggle.enabled, .addon-pin-toggle.disabled, .addon-pin-toggle:hover { border-color: transparent; background: transparent; box-shadow: none; }
+.addon-pin-toggle .switch-state { min-width: 58px; padding: 9px 13px; font-size: 13px; font-weight: 900; }
+.addon-description-field { display: flex; align-items: flex-start; max-width: min(620px, 100%); min-width: 0; color: #cbbda8; line-height: 1.35; overflow-wrap: anywhere; }
+.addon-description-field:not(.expanded) { align-items: center; }
+.addon-description-field span:last-child { min-width: 0; flex: 1 1 auto; }
+.addon-description-field:not(.expanded) span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.addon-description-field.expanded span:last-child { white-space: normal; }
+.addon-description-toggle { flex: 0 0 24px; }
+.addon-description-spacer { flex: 0 0 32px; }
+@keyframes addonNoticeFade {
+  0%, 86% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.addon-frame { width: 100%; min-height: min(70vh, 760px); border: 1px solid #302b25; border-radius: 8px; background: #101415; }
 .server-control-panel { display: grid; gap: 8px; }
 .server-control-panel .action-row { margin: 6px 0; }
 .server-control-panel .action-section { gap: 8px; padding: 12px; }

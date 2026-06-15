@@ -844,6 +844,105 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
   return { capabilities: { players: true, online }, rows: result.rows };
 }
 
+export async function addonLeadershipPlayers(db) {
+  const result = await listPlayers(db, {});
+  if (!result?.capabilities?.players) return result;
+  const rows = result.rows || [];
+  const [levels, factions] = await Promise.all([
+    leadershipLevels(db).catch(() => new Map()),
+    leadershipFactions(db).catch(() => new Map())
+  ]);
+  return {
+    capabilities: { players: true, leadership: true },
+    rows: rows.map((row) => {
+      const controllerId = String(row.player_controller_id || "");
+      const actorId = String(row.actor_id || "");
+      return {
+        actorId,
+        controllerId,
+        name: row.character_name || `Player ${actorId}`,
+        level: levels.get(controllerId) || levels.get(actorId) || 0,
+        faction: factions.get(controllerId) || factions.get(actorId) || "Unassigned",
+        guild: "Unavailable",
+        status: row.online_status || "Offline",
+        map: row.map || "",
+        lastSeen: row.last_seen || ""
+      };
+    })
+  };
+}
+
+async function leadershipLevels(db) {
+  const levels = new Map();
+  if (await tableExists(db, "player_state") && await tableExists(db, "actor_fgl_entities") && await tableExists(db, "fgl_entities")) {
+    const result = await db.query(`
+      select ps.player_controller_id::text as player_controller_id,
+             ps.player_pawn_id::text as player_pawn_id,
+             (fe.components->'FLevelComponent'->1->>'TotalXPEarned')::bigint as xp
+      from dune.player_state ps
+      join dune.actor_fgl_entities afe on afe.actor_id = ps.player_pawn_id
+      join dune.fgl_entities fe on fe.entity_id = afe.entity_id
+      where afe.slot_name = 'DuneCharacter'
+        and fe.components ? 'FLevelComponent'`);
+    for (const row of result.rows) {
+      const level = xpToLevel(Number(row.xp || 0));
+      if (row.player_controller_id) levels.set(String(row.player_controller_id), level);
+      if (row.player_pawn_id) levels.set(String(row.player_pawn_id), level);
+    }
+    if (levels.size) return levels;
+  }
+  if (!(await tableExists(db, "specialization_tracks"))) return levels;
+  const result = await db.query(`
+    select player_id::text as player_id,
+           coalesce(max(level), 0)::int as level
+    from dune.specialization_tracks
+    group by player_id`);
+  for (const row of result.rows) levels.set(String(row.player_id), Number(row.level) || 0);
+  return levels;
+}
+
+async function leadershipFactions(db) {
+  const current = await leadershipCurrentFactions(db);
+  if (current.size) return current;
+  return leadershipReputationFactions(db);
+}
+
+async function leadershipCurrentFactions(db) {
+  const factions = new Map();
+  if (!(await tableExists(db, "player_faction"))) return factions;
+  const hasFactions = await tableExists(db, "factions");
+  const result = await db.query(`
+    select pf.actor_id::text as actor_id,
+           pf.faction_id::text as faction_id,
+           ${hasFactions ? "coalesce(f.name, '')" : "''"} as faction_name
+    from dune.player_faction pf
+    ${hasFactions ? "left join dune.factions f on f.id = pf.faction_id" : ""}`);
+  for (const row of result.rows) factions.set(String(row.actor_id), factionDisplayName(row));
+  return factions;
+}
+
+async function leadershipReputationFactions(db) {
+  const factions = new Map();
+  if (!(await tableExists(db, "player_faction_reputation"))) return factions;
+  const hasFactions = await tableExists(db, "factions");
+  const result = await db.query(`
+    select distinct on (pfr.actor_id)
+           pfr.actor_id::text as actor_id,
+           pfr.faction_id::text as faction_id,
+           ${hasFactions ? "coalesce(f.name, '')" : "''"} as faction_name,
+           coalesce(pfr.reputation_amount, 0) as reputation_amount
+    from dune.player_faction_reputation pfr
+    ${hasFactions ? "left join dune.factions f on f.id = pfr.faction_id" : ""}
+    where coalesce(pfr.reputation_amount, 0) > 0
+    order by pfr.actor_id, coalesce(pfr.reputation_amount, 0) desc, pfr.faction_id`);
+  for (const row of result.rows) factions.set(String(row.actor_id), factionDisplayName(row));
+  return factions;
+}
+
+function factionDisplayName(row) {
+  return row.faction_name || (row.faction_id ? `Faction ${row.faction_id}` : "Unassigned");
+}
+
 async function playerLastSeenSelect(db) {
   const candidates = [
     ["player_state", "ps", ["last_seen", "last_seen_at", "last_online", "last_online_at", "last_avatar_activity", "last_login", "last_login_at", "last_login_time", "last_activity", "last_activity_at", "updated_at"]],

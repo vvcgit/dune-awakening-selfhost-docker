@@ -2,6 +2,7 @@
 runtime/secrets/
 runtime/generated/
 runtime/backups/
+runtime/addons/
 runtime/game/
 runtime/rabbitmq-admin/
 runtime/rabbitmq-game/
