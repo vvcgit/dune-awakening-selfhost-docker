@@ -225,7 +225,7 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
     const busy = busyAddonId === row.id;
     const pinned = Boolean(installedAddon && pinnedAddons.some((addon) => addon.id === installedAddon.id));
     return <tr key={row.id}>
-      <td><strong>{row.name}</strong></td>
+      <td><AddonNameCell addon={row} /></td>
       <td><AddonDescriptionCell value={row.description} expanded={Boolean(expandedDescriptions[row.id])} onToggle={() => setExpandedDescriptions((current) => ({ ...current, [row.id]: !current[row.id] }))} /></td>
       <td>{row.author}</td>
       <td>{row.version}</td>
@@ -241,6 +241,12 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
         : <span className="muted">-</span>}</td>
     </tr>;
   })}</tbody></table></div>;
+}
+
+function AddonNameCell({ addon }: { addon: CommunityAddonSummary }) {
+  const sourceUrl = String(addon.sourceUrl || "").trim();
+  if (!sourceUrl) return <strong>{addon.name}</strong>;
+  return <a className="addon-source-link" href={sourceUrl} target="_blank" rel="noreferrer" title="Open addon source on GitHub">{addon.name}</a>;
 }
 
 function PermissionList({ permissions, approvedPermissions }: { permissions: string[]; approvedPermissions: string[] }) {
