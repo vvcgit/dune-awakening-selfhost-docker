@@ -67,9 +67,24 @@ check_tcp() {
   fi
 }
 
+container_logs_have_udp_listener() {
+  local container="$1"
+  local port="$2"
+
+  [ -n "$container" ] || return 1
+  is_running "$container" || return 1
+
+  docker logs "$container" 2>&1 \
+    | grep -Eq "listening for (Clients|Servers) on [0-9.]+:${port}\\b"
+}
+
 check_udp() {
   local port="$1"
+  local container="${2:-}"
+
   if ss -lnup 2>/dev/null | grep -q ":$port "; then
+    echo "OK"
+  elif container_logs_have_udp_listener "$container" "$port"; then
     echo "OK"
   else
     issue=1
@@ -299,10 +314,10 @@ overmap_client_port="$client_port_base"
 survival_client_port="$((client_port_base + 1))"
 survival_s2s_port="$igw_port_base"
 overmap_s2s_port="$((igw_port_base + 1))"
-overmap_udp="$(check_udp "$overmap_client_port")"
-survival_udp="$(check_udp "$survival_client_port")"
-survival_s2s_udp="$(check_udp "$survival_s2s_port")"
-overmap_s2s_udp="$(check_udp "$overmap_s2s_port")"
+overmap_udp="$(check_udp "$overmap_client_port" "dune-server-overmap")"
+survival_udp="$(check_udp "$survival_client_port" "dune-server-survival-1")"
+survival_s2s_udp="$(check_udp "$survival_s2s_port" "dune-server-survival-1")"
+overmap_s2s_udp="$(check_udp "$overmap_s2s_port" "dune-server-overmap")"
 
 partition_count="unknown"
 if is_running dune-postgres; then
