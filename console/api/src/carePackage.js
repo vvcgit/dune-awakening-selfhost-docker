@@ -476,7 +476,12 @@ function hasSuccessfulGrant(config, playerId, kitId, actorId = "", identity = {}
 }
 
 function isSuccessfulGrant(row) {
-  return row?.status === "granted" || (row?.ok === true && !row?.status);
+  return row?.status === "granted" || (row?.ok === true && !row?.status) || hasDeliveredCarePackageContent(row);
+}
+
+function hasDeliveredCarePackageContent(row = {}) {
+  if (!Array.isArray(row.results)) return false;
+  return row.results.some((result) => result?.ok === true && result.operation !== "carePackageWelcomeWhisper");
 }
 
 function skippedGrant(config, kit, player, reason, source) {
