@@ -20,6 +20,7 @@ DIRECTOR_HEAL_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_COOLDOWN_SECONDS
 DYNAMIC_READY_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_STALE_SECONDS:-20}"
 DIRECTOR_BROWSER_SCAN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_BROWSER_SCAN_SECONDS:-30}"
 DYNAMIC_READY_HEAL_SCAN_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_SCAN_SECONDS:-30}"
+CHAT_EXCHANGE_REPAIR_SECONDS="${DUNE_AUTOSCALER_CHAT_EXCHANGE_REPAIR_SECONDS:-60}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
@@ -372,6 +373,13 @@ director_heal_due() {
     return 1
   fi
   director_heal_set "scan:${key}" "$now"
+}
+
+repair_chat_exchanges_due() {
+  director_heal_due chat_exchanges "$CHAT_EXCHANGE_REPAIR_SECONDS" || return 0
+  runtime/scripts/repair-chat-exchanges.sh >/dev/null 2>&1 || {
+    echo "WARN guild chat exchange repair failed"
+  }
 }
 
 dynamic_container_name_for_partition() {
@@ -1830,9 +1838,11 @@ scan_director_browser_state() {
 
 follow_director_hagga_handoffs &
 reconcile_always_on_maps
+repair_chat_exchanges_due
 
 while true; do
   reconcile_always_on_maps
+  repair_chat_exchanges_due
   scan_deepdesert_loading_responses
   ensure_overmap_travel_maps_prewarmed
   scan_travel_demand

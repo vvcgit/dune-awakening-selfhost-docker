@@ -1267,6 +1267,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .admin-global-actions { margin-top: 0; }
 .admin-global-actions button { width: auto; flex: 0 0 auto; }
 .admin-tools-panel .broadcast-line { display: grid; grid-template-columns: minmax(260px, 560px); align-items: end; }
+.admin-tools-panel .map-chat-line { border-top: 1px solid #302b25; margin-top: 14px; padding-top: 14px; }
 .admin-tools-panel .broadcast-title { width: min(360px, 100%); min-width: 0; flex: 0 1 360px; }
 .admin-tools-panel .broadcast-message { width: min(560px, 100%); min-width: 0; flex: 0 1 560px; }
 .admin-tools-panel .broadcast-message textarea { min-height: 96px; }

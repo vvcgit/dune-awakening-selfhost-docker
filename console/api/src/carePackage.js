@@ -652,7 +652,7 @@ function resolveWelcomeWhisperRecipient(playerId, body = {}) {
   return { funcomId, characterName, flsId, queue: flsId ? `${flsId}_queue` : "" };
 }
 
-async function ensureCarePackageServerPersona(db) {
+export async function ensureCarePackageServerPersona(db) {
   if (!db?.query) throw new Error("Care Package message whisper cannot be sent: database is unavailable for Server persona setup");
   const encryptedColumns = await tableColumns(db, "encrypted_accounts");
   if (encryptedColumns.has("id")) {
