@@ -204,7 +204,7 @@ while IFS= read -r faction_id; do
   [[ "$faction_id" =~ ^[0-9]+$ ]] || continue
 
   exchange="chat.faction.$faction_id"
-  if declare_exchange "$exchange" "fanout" "true"; then
+  if declare_exchange "$exchange" "fanout"; then
     declared=$((declared + 1))
   else
     failed=$((failed + 1))
