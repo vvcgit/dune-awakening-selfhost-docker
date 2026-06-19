@@ -1064,9 +1064,6 @@ import_db() {
 
   require_postgres
   identity_snapshot="$(capture_current_account_identities)"
-  if backup_is_external "$backup_file"; then
-    adopt_backup_battlegroup_id "$backup_file"
-  fi
 
   echo "WARNING: importing a database backup replaces current battlegroup database state."
   echo "A pre-import backup will be created first."
@@ -1081,6 +1078,10 @@ import_db() {
   fi
 
   DB_BACKUP_ORIGIN=restore-safety backup_db "$BACKUP_DIR_DEFAULT"
+  if backup_is_external "$backup_file"; then
+    adopt_backup_battlegroup_id "$backup_file"
+  fi
+
   stop_db_dependents
   recreate_dune_database
 
