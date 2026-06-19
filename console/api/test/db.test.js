@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError } from "../src/db.js";
+import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
 import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
@@ -28,6 +28,39 @@ test("detects destructive SQL and redacts connection strings", () => {
   assert.equal(isReadOnlySql("with x as (select 1) select * from x"), true);
   assert.equal(isReadOnlySql("delete from dune.items"), false);
   assert.doesNotMatch(redactDbError("postgres://dune:secret@127.0.0.1:15432/dune password=secret"), /secret/);
+});
+
+test("formats single database query results", () => {
+  assert.deepEqual(rowsResult({
+    fields: [{ name: "status", dataTypeID: 25 }],
+    rows: [{ status: "ok" }],
+    rowCount: 1,
+    command: "SELECT"
+  }), {
+    columns: [{ name: "status", dataTypeId: 25 }],
+    rows: [{ status: "ok" }],
+    rowCount: 1,
+    command: "SELECT"
+  });
+});
+
+test("formats multi-statement database query results using the final row result", () => {
+  assert.deepEqual(rowsResult([
+    { fields: [], rows: [], rowCount: null, command: "BEGIN" },
+    { fields: [], rows: [], rowCount: null, command: "DO" },
+    {
+      fields: [{ name: "status", dataTypeID: 25 }],
+      rows: [{ status: "seeded" }],
+      rowCount: 1,
+      command: "SELECT"
+    },
+    { fields: [], rows: [], rowCount: null, command: "COMMIT" }
+  ]), {
+    columns: [{ name: "status", dataTypeId: 25 }],
+    rows: [{ status: "seeded" }],
+    rowCount: 1,
+    command: "SELECT"
+  });
 });
 
 test("builds table preview query with quoted identifiers and parameters", async () => {
