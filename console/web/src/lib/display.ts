@@ -61,6 +61,8 @@ export function friendlyColumnName(value: string) {
     raw_name: "Raw Name",
     backupName: "Backup Name",
     battlegroupId: "Battlegroup ID",
+    size: "Size",
+    sizeBytes: "Size Bytes",
     vehicle: "Vehicle",
     actor: "Actor",
     templates: "Templates",
