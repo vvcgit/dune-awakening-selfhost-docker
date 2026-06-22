@@ -26,6 +26,7 @@ import { createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, 
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
+import { readCharacterTransferSettings, saveCharacterTransferSettings } from "./services/characterTransferSettings.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -303,6 +304,7 @@ async function handleApi(req, res) {
   if (path === "/api/admin/skill-modules") return commandJson(res, url.searchParams.get("q") ? "adminSkillModulesSearch" : "adminSkillModules", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/history") return commandJson(res, "adminHistory");
   if (path === "/api/admin/history/clear" && req.method === "POST") return clearAdminHistoryRoute(req, res);
+  if (path === "/api/admin/character-transfer-settings") return characterTransferSettingsRoute(req, res);
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/map-chat" && req.method === "POST") return mapChatRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
@@ -937,6 +939,20 @@ async function task(req, res, type, operation, payload) {
   }
   audit(config, req, `task.${operation}`, payload);
   return json(res, 202, { task: tasks.create(type, operation, payload) });
+}
+
+async function characterTransferSettingsRoute(req, res) {
+  if (req.method === "GET") return json(res, 200, readCharacterTransferSettings(config));
+  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
+  const body = await readJson(req);
+  try {
+    const result = saveCharacterTransferSettings(config, body.settings || {}, { defaults: Boolean(body.restoreDefaults) });
+    const payload = { service: "director" };
+    audit(config, req, "admin.character-transfer-settings.save", { restoreDefaults: Boolean(body.restoreDefaults), settings: result.settings });
+    return json(res, 202, { ok: true, settings: result.settings, path: result.path, task: tasks.create("server", "restartService", payload) });
+  } catch (error) {
+    return json(res, error.statusCode || 500, { error: redact(error.message || error) });
+  }
 }
 
 async function confirmedTask(req, res, type, operation, payload, phrase) {
